@@ -16,7 +16,7 @@ export default function InstallBanner({ phone }) {
   } = usePushNotifications(phone);
 
   const [dismissed, setDismissed] = useState(true); // default hidden until we check localStorage, avoids flash
-  const [showIosHelp, setShowIosHelp] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
     try {
@@ -32,6 +32,7 @@ export default function InstallBanner({ phone }) {
   }
 
   const isIos = typeof navigator !== 'undefined' && /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
   const needsNotifications = supported && permission !== 'granted' && !subscribed;
   const needsInstall = !isInstalled;
 
@@ -42,90 +43,123 @@ export default function InstallBanner({ phone }) {
   if (!supported && !needsInstall) return null;
 
   async function handleEnableNotifications() {
-    const ok = await subscribe();
-    if (!ok && Notification.permission === 'denied') {
-      // Permission was actively denied — nothing more we can do
-      // programmatically; leave the banner so they see the explanation.
+    await subscribe();
+  }
+
+  // The main button is ALWAYS clickable, regardless of whether the
+  // browser fired its native beforeinstallprompt event — that event is
+  // unreliable (Chrome engagement heuristics, never fires on iOS/Firefox
+  // at all) so a button that only works when it happened to fire left
+  // most visitors with a banner that looked clickable but did nothing.
+  // If the native prompt is ready, use it; otherwise open clear
+  // step-by-step instructions for the platform instead.
+  function handleInstallClick() {
+    if (canPromptInstall) {
+      promptInstall();
+    } else {
+      setShowHelp(true);
     }
   }
 
   return (
     <div className="glass-card" style={{
-      borderRadius: 16, padding: '14px 16px', marginBottom: 18,
-      background: 'var(--brand-gradient-soft)', border: '1.5px solid var(--purple-mid)',
-      display: 'flex', alignItems: 'flex-start', gap: 12, position: 'relative',
+      borderRadius: 18, padding: '18px 18px 18px 16px', marginBottom: 18,
+      background: 'var(--brand-gradient)', border: 'none',
+      display: 'flex', alignItems: 'center', gap: 14, position: 'relative',
+      boxShadow: 'var(--shadow-glow-purple)', overflow: 'hidden',
     }}>
+      {/* Decorative glow orbs for visual interest */}
+      <div style={{ position: 'absolute', top: -30, right: -20, width: 120, height: 120, background: 'rgba(255,255,255,0.12)', borderRadius: '50%', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: -40, left: 40, width: 100, height: 100, background: 'rgba(255,255,255,0.08)', borderRadius: '50%', pointerEvents: 'none' }} />
+
       <button onClick={dismiss} aria-label="Dismiss" style={{
-        position: 'absolute', top: 8, right: 8, width: 24, height: 24, borderRadius: 8,
-        background: 'rgba(255,255,255,0.6)', border: 'none', display: 'flex', alignItems: 'center',
-        justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)',
+        position: 'absolute', top: 10, right: 10, width: 26, height: 26, borderRadius: 8,
+        background: 'rgba(255,255,255,0.2)', border: 'none', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', cursor: 'pointer', color: '#fff', zIndex: 2,
       }}>
-        <Icon.X size={12} />
+        <Icon.X size={13} />
       </button>
 
-      <div style={{ width: 38, height: 38, borderRadius: 11, background: 'var(--brand-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: 'var(--shadow-glow-purple)' }}>
-        <Icon.BarChart size={18} style={{ color: '#fff' }} />
+      <div style={{
+        width: 50, height: 50, borderRadius: 14, background: 'rgba(255,255,255,0.2)',
+        backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, border: '1px solid rgba(255,255,255,0.3)', position: 'relative', zIndex: 1,
+      }}>
+        <Icon.BarChart size={24} style={{ color: '#fff' }} />
       </div>
 
-      <div style={{ flex: 1, minWidth: 0, paddingRight: 20 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--text)', marginBottom: 3 }}>
-          {needsInstall ? 'Install ReviewKE & get notified' : 'Turn on notifications'}
+      <div style={{ flex: 1, minWidth: 0, paddingRight: 22, position: 'relative', zIndex: 1 }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 3 }}>
+          {needsInstall ? 'Get the ReviewKE app' : 'Turn on notifications'}
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 10 }}>
+        <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.88)', lineHeight: 1.5, marginBottom: 12 }}>
           {needsInstall
-            ? 'Add ReviewKE to your home screen and we\'ll alert you the moment a new paid review job opens — even when the app is closed.'
-            : 'Get alerted the moment a new paid review job opens — even when the app is closed.'}
+            ? 'Install to your home screen and get notified the instant a new paid review job opens.'
+            : 'Get notified the instant a new paid review job opens — even when the app is closed.'}
         </div>
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {needsInstall && canPromptInstall && (
-            <button onClick={promptInstall} style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
-              background: 'var(--brand-gradient)', color: '#fff', border: 'none', borderRadius: 9,
-              fontSize: 12.5, fontWeight: 700, cursor: 'pointer', boxShadow: 'var(--shadow-glow-purple)',
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          {needsInstall && (
+            <button onClick={handleInstallClick} style={{
+              display: 'flex', alignItems: 'center', gap: 7, padding: '11px 20px',
+              background: '#fff', color: 'var(--purple)', border: 'none', borderRadius: 11,
+              fontSize: 14, fontWeight: 800, cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.2)', transition: 'transform .15s',
             }}>
-              <Icon.ArrowRight size={13} /> Install app
+              <Icon.ArrowRight size={15} /> Install ReviewKE
             </button>
           )}
 
-          {needsInstall && !canPromptInstall && isIos && (
-            <button onClick={() => setShowIosHelp(v => !v)} style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
-              background: '#fff', color: 'var(--purple)', border: '1.5px solid var(--purple-mid)', borderRadius: 9,
-              fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
-            }}>
-              <Icon.Info size={13} /> How to install on iPhone
-            </button>
-          )}
-
-          {needsNotifications && (!needsInstall || isInstalled) && (
+          {needsNotifications && !needsInstall && (
             <button onClick={handleEnableNotifications} disabled={loading} style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
-              background: 'var(--brand-gradient)', color: '#fff', border: 'none', borderRadius: 9,
-              fontSize: 12.5, fontWeight: 700, cursor: loading ? 'default' : 'pointer',
-              opacity: loading ? 0.7 : 1, boxShadow: 'var(--shadow-glow-purple)',
+              display: 'flex', alignItems: 'center', gap: 7, padding: '11px 20px',
+              background: '#fff', color: 'var(--purple)', border: 'none', borderRadius: 11,
+              fontSize: 14, fontWeight: 800, cursor: loading ? 'default' : 'pointer',
+              opacity: loading ? 0.7 : 1, boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
             }}>
-              <Icon.Zap size={13} /> {loading ? 'Enabling...' : 'Enable notifications'}
+              <Icon.Zap size={15} /> {loading ? 'Enabling...' : 'Enable notifications'}
             </button>
           )}
 
           {permission === 'denied' && (
-            <span style={{ fontSize: 11.5, color: '#e53e3e', display: 'flex', alignItems: 'center', gap: 5 }}>
-              <Icon.Info size={12} /> Notifications blocked — enable them in your browser's site settings
+            <span style={{ fontSize: 11.5, color: '#fff', display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(0,0,0,0.15)', padding: '6px 10px', borderRadius: 8 }}>
+              <Icon.Info size={12} /> Blocked — enable in browser settings
             </span>
           )}
         </div>
 
-        {showIosHelp && (
-          <div style={{ marginTop: 12, padding: '10px 12px', background: '#fff', borderRadius: 10, border: '1px solid var(--border)' }}>
-            <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
-              <li>Tap the <strong>Share</strong> button in Safari (the square with an arrow)</li>
-              <li>Scroll down and tap <strong>Add to Home Screen</strong></li>
-              <li>Open ReviewKE from your home screen, then enable notifications from there</li>
+        {showHelp && needsInstall && (
+          <div style={{ marginTop: 14, padding: '14px 16px', background: '#fff', borderRadius: 12, boxShadow: '0 4px 14px rgba(0,0,0,0.15)' }}>
+            <div style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--text)', marginBottom: 8 }}>
+              {isIos ? 'Install on iPhone / iPad' : isAndroid ? 'Install on Android' : 'Install on this browser'}
+            </div>
+            <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.9 }}>
+              {isIos ? (
+                <>
+                  <li>Tap the <strong>Share</strong> button in Safari (square with an arrow, in the toolbar)</li>
+                  <li>Scroll down and tap <strong>Add to Home Screen</strong></li>
+                  <li>Tap <strong>Add</strong> — ReviewKE will appear on your home screen</li>
+                </>
+              ) : isAndroid ? (
+                <>
+                  <li>Tap the <strong>⋮</strong> menu in your browser (top right)</li>
+                  <li>Tap <strong>Add to Home screen</strong> or <strong>Install app</strong></li>
+                  <li>Confirm — ReviewKE will appear on your home screen</li>
+                </>
+              ) : (
+                <>
+                  <li>Look for an <strong>install icon</strong> in your browser's address bar</li>
+                  <li>Or open your browser menu and look for <strong>Install ReviewKE</strong></li>
+                </>
+              )}
             </ol>
+            <button onClick={() => setShowHelp(false)} style={{ marginTop: 10, fontSize: 11.5, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              Got it
+            </button>
           </div>
         )}
       </div>
     </div>
   );
 }
+

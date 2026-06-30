@@ -291,7 +291,8 @@ export default function Businesses() {
           <div className="glass-card" style={{ borderRadius:18, padding:20, marginBottom:16 }}>
             <div style={{ fontSize:12, fontWeight:800, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:16 }}>Your Status</div>
             {[
-              { icon:'Send', label:'Reviews Submitted', value:`${reviewCount}/${user?.plan==='pro'?'∞':DAILY_FREE_LIMIT}`, color:'var(--pink)' },
+              { icon:'Send', label:'Reviews Today', value:`${user?.plan==='pro' ? '∞' : DAILY_FREE_LIMIT - remaining}/${user?.plan==='pro'?'∞':DAILY_FREE_LIMIT}`, color:'var(--pink)' },
+              { icon:'Star', label:'Reviews Written (all-time)', value:String(reviewCount), color:'var(--purple)' },
               { icon:'DollarSign', label:'Per review', value:`${format(MIN_EARN)}–${format(MAX_EARN)}`, color:'var(--green)' },
               { icon:'Wallet', label:'Balance', value:format(balance), color:'#7C3AED' },
             ].map(s => {
