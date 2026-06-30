@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Icon from '../lib/icons';
-import { normalizePhone, isValidPhone } from '../lib/useUser';
+import { normalizePhone, isValidPhone, accountExists } from '../lib/useUser';
 
 const REVIEW_PREFERENCES = [
   {
@@ -34,7 +34,7 @@ const SCAN_STEPS = [
 // _app.js in place of EVERY route when no user is signed in — there is
 // no homepage, no marketing page, and no way to click past it without
 // completing signup or logging in. See _app.js for the gate logic.
-export default function RegistrationGate({ onAuth, onLogin }) {
+export default function RegistrationGate({ onSignup, onLogin }) {
   const [tab, setTab] = useState('signup');
   const [step, setStep] = useState('form'); // form | preference | scanning
   const [name, setName] = useState('');
@@ -58,6 +58,15 @@ export default function RegistrationGate({ onAuth, onLogin }) {
   function handlePrimaryAction() {
     if (!validateForm()) return;
     if (tab === 'signup') {
+      // Check for a duplicate immediately, before the preference step or
+      // any scanning animation — no point making someone pick local vs
+      // international and watch a fake AI scan only to be told at the
+      // very end that they already have an account.
+      if (accountExists(normalizePhone(phone))) {
+        setTab('login');
+        setError('This number is already registered on this device — log in instead.');
+        return;
+      }
       setStep('preference');
       return;
     }
@@ -65,6 +74,22 @@ export default function RegistrationGate({ onAuth, onLogin }) {
     // plan, review preference) instead of creating a fresh placeholder —
     // that's what makes "log in and continue where you left off" work.
     onLogin(phone, { email });
+  }
+
+  // Actually creates the account via onSignup(), which refuses (returns
+  // success:false, reason:'exists') if this phone number is ALREADY
+  // registered on this device. That's what stops a duplicate entry from
+  // ever being created — if it already exists, we switch the person to
+  // the Log in tab with their number pre-filled and a clear explanation,
+  // instead of silently overwriting their real account's data.
+  function createAccount(fullPhone) {
+    const result = onSignup({ name: name.trim(), phone: fullPhone, email, reviewPreference: preference });
+    if (!result.success && result.reason === 'exists') {
+      setStep('form');
+      setTab('login');
+      setError('This number is already registered on this device — log in instead.');
+      return;
+    }
   }
 
   function finishSignup() {
@@ -78,14 +103,12 @@ export default function RegistrationGate({ onAuth, onLogin }) {
         setScanPhase(phase);
         if (phase >= SCAN_STEPS.length - 1) {
           clearInterval(interval);
-          setTimeout(() => {
-            onAuth({ name: name.trim(), phone: fullPhone, email, reviewPreference: preference });
-          }, 900);
+          setTimeout(() => createAccount(fullPhone), 900);
         }
       }, 750);
       return;
     }
-    onAuth({ name: name.trim(), phone: fullPhone, email, reviewPreference: preference });
+    createAccount(fullPhone);
   }
 
   return (
