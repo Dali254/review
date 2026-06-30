@@ -17,7 +17,7 @@ const GATE_EXEMPT_ROUTES = ['/admin'];
 // displays (if any) stay consistent with the rest of the app.
 function Gate({ Component, pageProps }) {
   const router = useRouter();
-  const { user, loaded, login } = useUser();
+  const { user, loaded, login, loginByPhone } = useUser();
   const exempt = GATE_EXEMPT_ROUTES.includes(router.pathname);
 
   // Wait for the localStorage check to finish before deciding — avoids a
@@ -31,7 +31,7 @@ function Gate({ Component, pageProps }) {
   }
 
   if (!user && !exempt) {
-    return <RegistrationGate onAuth={login} />;
+    return <RegistrationGate onAuth={login} onLogin={loginByPhone} />;
   }
 
   return <Component {...pageProps} />;

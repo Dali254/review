@@ -67,6 +67,44 @@ function StarRow({ value, onChange, size = 20 }) {
   );
 }
 
+// Large, thumb-friendly single star picker — the one required action on
+// the rating screen. Bigger tap targets than StarRow since this is meant
+// to be the fast, obvious, can't-miss-it control.
+function BigStarRow({ value, onChange }) {
+  const [hov, setHov] = useState(0);
+  const active = hov || value;
+  return (
+    <div style={{ display:'flex', gap:8 }}>
+      {[1,2,3,4,5].map(i => {
+        const lit = i <= active;
+        return (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onChange(i)}
+            onMouseEnter={() => setHov(i)}
+            onMouseLeave={() => setHov(0)}
+            aria-label={`Rate ${i} star${i>1?'s':''}`}
+            style={{
+              width:52, height:52,
+              display:'flex', alignItems:'center', justifyContent:'center',
+              borderRadius:14,
+              border: lit ? '2px solid #fde68a' : '2px solid var(--border-strong)',
+              background: lit ? 'linear-gradient(135deg,#fffbeb,#fef3c7)' : '#f8f9fc',
+              cursor:'pointer',
+              transition:'all .15s cubic-bezier(.4,0,.2,1)',
+              transform: lit ? 'scale(1.08)' : 'scale(1)',
+              boxShadow: lit ? '0 4px 14px rgba(245,158,11,0.3)' : 'none',
+              padding:0,
+            }}>
+            <Icon.Star size={26} filled={lit} style={{ color: lit ? '#F59E0B' : '#c4c4d0' }}/>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function generateReviews(bizId, category) {
   const names = ['Wanjiru M.','Otieno K.','Achieng N.','Kamau J.','Njeri P.','Mwangi T.'];
   const texts = [
@@ -99,7 +137,9 @@ export default function BusinessPage() {
   const [authOpen, setAuthOpen]     = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [stage, setStage]           = useState('detail'); // detail | rating | submitted
-  const [catRatings, setCatRatings] = useState({});
+  const [overallRating, setOverallRating] = useState(0); // the one rating that's actually required
+  const [catRatings, setCatRatings] = useState({}); // optional per-category detail, shown in a collapsible section
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [reviewText, setReviewText] = useState('');
   const [logoOk, setLogoOk]         = useState(true);
   const [photoOk, setPhotoOk]       = useState(true);
@@ -218,8 +258,16 @@ export default function BusinessPage() {
 
   const categories = RATING_CATEGORIES[biz.category] || RATING_CATEGORIES.Banking;
   const catKeys = categories.map(c => c[0]);
-  const allRated = catKeys.every(k => catRatings[k] > 0);
-  const avgRating = catKeys.length ? Math.round(catKeys.reduce((s,k) => s + (catRatings[k]||0), 0) / catKeys.length) : 0;
+  // Only the overall star rating is required to submit — this is the
+  // single biggest change for reducing scroll and friction. The 4
+  // per-category ratings are optional extra detail in a collapsible
+  // section; if the user fills any in, they nudge the average slightly,
+  // but the overall rating alone is enough to publish and get paid.
+  const allRated = overallRating > 0;
+  const ratedCatKeys = catKeys.filter(k => catRatings[k] > 0);
+  const avgRating = ratedCatKeys.length
+    ? Math.round((overallRating + ratedCatKeys.reduce((s,k) => s + catRatings[k], 0)) / (1 + ratedCatKeys.length))
+    : overallRating;
   const earn = EARN_RATES[avgRating || 3] || 25;
 
   const seed = biz.id.charCodeAt(0) + biz.id.charCodeAt(biz.id.length-1);
@@ -229,6 +277,7 @@ export default function BusinessPage() {
   function startReview() {
     if (!user) { setAuthOpen(true); return; }
     if (hasReviewed(biz.id)) { toast('You already reviewed this business', 'error'); return; }
+    if (getRemainingTasks() <= 0) { setUpgradeOpen(true); return; }
     setStage('rating');
   }
 
@@ -240,7 +289,10 @@ export default function BusinessPage() {
     if (hasReviewed(biz.id)) { toast('You already reviewed this business', 'error'); return; }
     if (!allRated) { toast('Please rate every category', 'error'); return; }
     if (PUBLISH_FEE_KES <= 0) {
-      // Free to publish — credit immediately, no STK push needed
+      // Free to publish — credit immediately, no STK push needed.
+      // Still counts toward the daily limit, same as every other path.
+      if (getRemainingTasks() <= 0) { setUpgradeOpen(true); return; }
+      consumeTask();
       addEarning(earn, `Review: ${biz.name}`);
       markReviewed(biz.id);
       celebrate(earn, `Your review for ${biz.name} is live`);
@@ -264,6 +316,8 @@ export default function BusinessPage() {
 
   function handlePublishViaShare() {
     if (sharedCount < SHARE_TARGET_COUNT) return;
+    if (getRemainingTasks() <= 0) { setUpgradeOpen(true); return; }
+    consumeTask();
     addEarning(earn, `Review: ${biz.name}`);
     markReviewed(biz.id);
     celebrate(earn, `Your review for ${biz.name} is live`);
@@ -276,8 +330,7 @@ export default function BusinessPage() {
 
   async function handlePay() {
     if (payPhone.length < 9) { toast('Enter your Safaricom number','error'); return; }
-    const ok = consumeTask();
-    if (!ok) { setPayStep(null); setUpgradeOpen(true); return; }
+    if (getRemainingTasks() <= 0) { setPayStep(null); setUpgradeOpen(true); return; }
     setPayStep('pending');
 
     const reference = `RKE-VERIFY-${Date.now()}`;
@@ -314,6 +367,7 @@ export default function BusinessPage() {
       const data = await res.json();
 
       if (data.status === 'SUCCESS') {
+        consumeTask();
         addEarning(earn, `Review: ${biz.name}`);
         markReviewed(biz.id);
         celebrate(earn, `Your review for ${biz.name} is live`);
@@ -350,7 +404,9 @@ export default function BusinessPage() {
 
   function resetForAnother() {
     setStage('detail');
+    setOverallRating(0);
     setCatRatings({});
+    setDetailsOpen(false);
     setReviewText('');
   }
 
@@ -403,7 +459,7 @@ export default function BusinessPage() {
         {/* ── STAGE 1: DETAIL ── */}
         {stage === 'detail' && (
           <div className="fade-up" style={{ background:'#fff', borderRadius:24, border:'1px solid var(--border)', overflow:'hidden', boxShadow:'var(--shadow-lg)' }}>
-            <div style={{ height:260, position:'relative', overflow:'hidden', background: photoOk ? '#f1f5f9' : `linear-gradient(135deg, ${biz.color}25, ${biz.color}08)`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ height:200, position:'relative', overflow:'hidden', background: photoOk ? '#f1f5f9' : `linear-gradient(135deg, ${biz.color}25, ${biz.color}08)`, display:'flex', alignItems:'center', justifyContent:'center' }}>
               {photoOk && (
                 <img
                   src={photoUrl(biz, 1000)}
@@ -416,65 +472,47 @@ export default function BusinessPage() {
 
               {photoOk ? (
                 logoOk && (
-                  <div style={{ position:'absolute', bottom:18, left:18, width:64, height:64, borderRadius:16, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'var(--shadow-lg)', padding:10, zIndex:1 }}>
+                  <div style={{ position:'absolute', bottom:14, left:14, width:52, height:52, borderRadius:14, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'var(--shadow-lg)', padding:8, zIndex:1 }}>
                     <img src={logoUrl(biz,128)} alt={biz.name} onError={()=>setLogoOk(false)} style={{ width:'100%', height:'100%', objectFit:'contain' }}/>
                   </div>
                 )
               ) : (
                 logoOk ? (
                   <img src={logoUrl(biz, 256)} alt={biz.name} onError={()=>setLogoOk(false)}
-                    style={{ width:120, height:120, objectFit:'contain', position:'relative', zIndex:1, borderRadius:24, background:'#fff', padding:20, boxShadow:'var(--shadow-md)' }}/>
+                    style={{ width:96, height:96, objectFit:'contain', position:'relative', zIndex:1, borderRadius:22, background:'#fff', padding:16, boxShadow:'var(--shadow-md)' }}/>
                 ) : (
-                  <div style={{ width:120, height:120, borderRadius:24, background:`linear-gradient(135deg,${biz.color},${biz.color}90)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:46, fontWeight:900, color:'#fff', position:'relative', zIndex:1, boxShadow:'var(--shadow-md)' }}>
+                  <div style={{ width:96, height:96, borderRadius:22, background:`linear-gradient(135deg,${biz.color},${biz.color}90)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:38, fontWeight:900, color:'#fff', position:'relative', zIndex:1, boxShadow:'var(--shadow-md)' }}>
                     {biz.initial}
                   </div>
                 )
               )}
               {biz.verified && (
-                <div style={{ position:'absolute', top:16, right:16, display:'flex', alignItems:'center', gap:5, background:'rgba(255,255,255,0.9)', backdropFilter:'blur(8px)', padding:'5px 12px', borderRadius:20, fontSize:11, fontWeight:700, color:'var(--green)', zIndex:1 }}>
+                <div style={{ position:'absolute', top:14, right:14, display:'flex', alignItems:'center', gap:5, background:'rgba(255,255,255,0.9)', backdropFilter:'blur(8px)', padding:'5px 12px', borderRadius:20, fontSize:11, fontWeight:700, color:'var(--green)', zIndex:1 }}>
                   <Icon.CheckCircle size={12}/>Verified
                 </div>
               )}
             </div>
 
-            <div className="biz-detail-card-pad" style={{ padding:'28px 28px 32px' }}>
+            <div className="biz-detail-card-pad" style={{ padding:'22px 24px 26px' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6, gap:12 }}>
-                <h1 style={{ fontSize:24, fontWeight:800 }}>{biz.name} <span style={{ fontSize:14, fontWeight:500, color:'var(--text-muted)' }}>KE</span></h1>
-                <span style={{ background:'var(--pink-light)', color:'var(--pink)', fontSize:12, fontWeight:700, padding:'5px 12px', borderRadius:20, whiteSpace:'nowrap' }}>{biz.category}</span>
+                <h1 style={{ fontSize:22, fontWeight:800 }}>{biz.name}</h1>
+                <span style={{ background:'var(--pink-light)', color:'var(--pink)', fontSize:11, fontWeight:700, padding:'4px 11px', borderRadius:20, whiteSpace:'nowrap' }}>{biz.category}</span>
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:18 }}>
-                <Icon.MapPin size={13} style={{ color:'var(--pink)' }}/>
-                <span style={{ fontSize:14, color:'var(--text-secondary)' }}>{biz.address}</span>
-              </div>
-              <p style={{ fontSize:15, color:'var(--text-secondary)', lineHeight:1.65, marginBottom:24 }}>{biz.description}</p>
-
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:24 }}>
-                <div style={{ background:'#f8f9fc', borderRadius:14, padding:'14px 16px' }}>
-                  <div style={{ fontSize:12, color:'var(--text-muted)', marginBottom:6 }}>Avg. rating</div>
-                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    <Icon.Star size={16} filled style={{ color:'#F59E0B' }}/>
-                    <span style={{ fontSize:17, fontWeight:800 }}>{baseRating} <span style={{ fontWeight:500, fontSize:13, color:'var(--text-muted)' }}>({reviewCount.toLocaleString()})</span></span>
-                  </div>
-                </div>
-                <div style={{ background:'#f8f9fc', borderRadius:14, padding:'14px 16px' }}>
-                  <div style={{ fontSize:12, color:'var(--text-muted)', marginBottom:6 }}>Earn per review</div>
-                  <div style={{ fontSize:17, fontWeight:800, color:'var(--green)' }}>{format(MIN_EARN)}–{format(MAX_EARN)}</div>
-                </div>
+              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:16 }}>
+                <Icon.Star size={13} filled style={{ color:'#F59E0B' }}/>
+                <span style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>{baseRating}</span>
+                <span style={{ fontSize:12, color:'var(--text-muted)' }}>({reviewCount.toLocaleString()}) · {biz.address.split(',').slice(-1)[0].trim()}</span>
               </div>
 
-              {/* Earn-by-stars strip */}
+              {/* Compact earn-by-stars strip — the only "how much" info needed before starting */}
               <div style={{ display:'flex', gap:6, marginBottom:20 }}>
                 {[1,2,3,4,5].map(s => (
-                  <div key={s} style={{ flex:1, textAlign:'center', background: s===5 ? 'linear-gradient(135deg,#fffbeb,#fef3c7)' : '#f8f9fc', border: s===5 ? '1.5px solid #fde68a' : '1px solid var(--border)', borderRadius:10, padding:'8px 4px' }}>
+                  <div key={s} style={{ flex:1, textAlign:'center', background: s===5 ? 'linear-gradient(135deg,#fffbeb,#fef3c7)' : '#f8f9fc', border: s===5 ? '1.5px solid #fde68a' : '1px solid var(--border)', borderRadius:10, padding:'7px 4px' }}>
                     <div style={{ fontSize:10, color:'var(--text-muted)', marginBottom:2 }}>{s}★</div>
                     <div style={{ fontSize:12, fontWeight:800, color: s===5 ? '#D97706' : 'var(--text-secondary)' }}>{EARN_RATES[s]}</div>
                   </div>
                 ))}
               </div>
-
-              <p style={{ fontSize:13, color:'var(--text-muted)', lineHeight:1.6, marginBottom:22 }}>
-                You'll rate {biz.name} on {categories.length} categories, then write an optional review. Submitting earns you up to {format(EARN_RATES[5])}.
-              </p>
 
               {hasReviewed(biz.id) ? (
                 <>
@@ -504,91 +542,103 @@ export default function BusinessPage() {
         {stage === 'rating' && (
           <div className="fade-up" style={{ background:'#fff', borderRadius:24, border:'1px solid var(--border)', overflow:'hidden', boxShadow:'var(--shadow-lg)' }}>
             {/* Header band */}
-            <div className="rating-header-band" style={{ padding:'26px 28px 22px', background:'var(--brand-gradient-soft)', borderBottom:'1px solid var(--border)' }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
-                <div>
-                  <h2 style={{ fontSize:21, fontWeight:800, marginBottom:4 }}>Rate Your Experience</h2>
-                  <p style={{ fontSize:13, color:'var(--text-secondary)' }}>Rate {biz.name} on each category below</p>
-                </div>
-                {avgRating > 0 && (
-                  <div style={{ display:'flex', alignItems:'center', gap:8, background:'#fff', border:'1.5px solid var(--pink-mid)', borderRadius:14, padding:'8px 16px', boxShadow:'var(--shadow)' }}>
-                    <Icon.TrendingUp size={15} style={{ color:'var(--pink)' }}/>
-                    <span style={{ fontSize:13, color:'var(--text-secondary)' }}>You'll earn</span>
-                    <span style={{ fontSize:18, fontWeight:800, color:'var(--pink)' }}>{format(earn)}</span>
-                  </div>
-                )}
-              </div>
-              {/* Progress dots */}
-              <div style={{ display:'flex', gap:6, marginTop:18 }}>
-                {catKeys.map(k => (
-                  <div key={k} style={{ flex:1, height:5, borderRadius:3, background: catRatings[k] ? 'var(--pink)' : 'var(--border-strong)', transition:'background .2s' }}/>
-                ))}
-              </div>
+            <div className="rating-header-band" style={{ padding:'24px 28px 20px', background:'var(--brand-gradient-soft)', borderBottom:'1px solid var(--border)', textAlign:'center' }}>
+              <h2 style={{ fontSize:19, fontWeight:800, marginBottom:4 }}>Rate {biz.name}</h2>
+              <p style={{ fontSize:13, color:'var(--text-secondary)' }}>Tap a star — that's it, you're done</p>
             </div>
 
-            <div className="rating-body-pad" style={{ padding:'8px 28px 28px' }}>
-              {categories.map(([label, iconName], i) => {
-                const IC = Icon[iconName] || Icon.Star;
-                const rated = catRatings[label] > 0;
-                return (
-                  <div key={label} style={{
-                    display:'flex', alignItems:'center', justifyContent:'space-between',
-                    padding:'18px 4px', borderBottom: i<categories.length-1 ? '1px solid var(--border)' : 'none',
-                    flexWrap:'wrap', gap:14,
-                  }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:13 }}>
-                      <div style={{
-                        width:42, height:42, borderRadius:12, flexShrink:0,
-                        display:'flex', alignItems:'center', justifyContent:'center',
-                        background: rated ? 'linear-gradient(135deg,var(--pink),var(--pink-bright))' : 'var(--pink-light)',
-                        transition:'all .2s',
-                        boxShadow: rated ? '0 3px 10px rgba(192,24,95,0.3)' : 'none',
-                      }}>
-                        <IC size={18} style={{ color: rated ? '#fff' : 'var(--pink)' }}/>
-                      </div>
-                      <div>
-                        <div style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>{label}</div>
-                        {rated && <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:1 }}>{['','Poor','Fair','Good','Very good','Excellent'][catRatings[label]]}</div>}
-                      </div>
+            <div className="rating-body-pad" style={{ padding:'24px 28px 28px' }}>
+              {/* The one required action: big overall star rating */}
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', marginBottom:22 }}>
+                <BigStarRow value={overallRating} onChange={setOverallRating} />
+                <div style={{ minHeight:22, marginTop:10 }}>
+                  {overallRating > 0 && (
+                    <div style={{ display:'flex', alignItems:'center', gap:8, background:'#fff', border:'1.5px solid var(--pink-mid)', borderRadius:14, padding:'7px 16px', boxShadow:'var(--shadow)' }}>
+                      <span style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>{['','Poor','Fair','Good','Very good','Excellent'][overallRating]}</span>
+                      <span style={{ width:1, height:14, background:'var(--border)' }}/>
+                      <Icon.TrendingUp size={14} style={{ color:'var(--pink)' }}/>
+                      <span style={{ fontSize:15, fontWeight:800, color:'var(--pink)' }}>{format(earn)}</span>
                     </div>
-                    <StarRow value={catRatings[label]||0} onChange={v => setCatRating(label,v)}/>
-                  </div>
-                );
-              })}
-
-              {/* Optional review text */}
-              <div style={{ marginTop:24, marginBottom:22 }}>
-                <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:700, color:'var(--text-secondary)', marginBottom:10, textTransform:'uppercase', letterSpacing:'0.4px' }}>
-                  <Icon.Sparkles size={13} style={{ color:'var(--pink)' }}/>
-                  Written review <span style={{ fontWeight:400, textTransform:'none', letterSpacing:0, color:'var(--text-muted)' }}>(optional)</span>
-                </label>
-                <textarea
-                  value={reviewText}
-                  onChange={e=>setReviewText(e.target.value)}
-                  rows={3}
-                  placeholder="Share more about your experience..."
-                  style={{
-                    background:'#f8f9fc',
-                    border:'1.5px solid var(--border-strong)',
-                    color:'var(--text)',
-                    resize:'none',
-                  }}
-                />
+                  )}
+                </div>
               </div>
 
+              {/* Primary action — visible immediately, no scrolling needed */}
               <button onClick={handleContinue} disabled={!allRated} style={{
                 width:'100%', padding:16,
-                background: allRated ? 'linear-gradient(135deg,var(--pink),var(--pink-bright))' : '#eceef3',
+                background: allRated ? 'var(--brand-gradient)' : '#eceef3',
                 color: allRated ? '#fff' : 'var(--text-muted)',
                 border:'none', borderRadius:14, fontSize:16, fontWeight:700,
                 cursor: allRated?'pointer':'not-allowed',
                 display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                boxShadow: allRated ? '0 8px 24px rgba(192,24,95,0.32)' : 'none',
-                transition:'all .2s',
+                boxShadow: allRated ? 'var(--shadow-glow-pink)' : 'none',
+                transition:'all .2s', marginBottom:14,
               }}>
-                {allRated ? `Continue — Earn ${format(earn)}` : `Rate all ${categories.length} categories to continue`}
+                {allRated ? `Submit — Earn ${format(earn)}` : 'Tap a star to continue'}
                 <Icon.ArrowRight size={17}/>
               </button>
+
+              {/* Optional detail — collapsed by default, never blocks submission */}
+              <button
+                onClick={() => setDetailsOpen(v => !v)}
+                style={{
+                  width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
+                  padding:'12px 14px', background:'#f8f9fc', border:'1px solid var(--border)',
+                  borderRadius:12, cursor:'pointer', marginBottom: detailsOpen ? 14 : 0,
+                }}
+              >
+                <span style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, fontWeight:600, color:'var(--text-secondary)' }}>
+                  <Icon.Sparkles size={14} style={{ color:'var(--pink)' }}/>
+                  Add detail <span style={{ fontWeight:400, color:'var(--text-muted)' }}>(optional, boosts payout)</span>
+                </span>
+                <Icon.ChevronDown size={16} style={{ color:'var(--text-muted)', transform: detailsOpen ? 'rotate(180deg)' : 'none', transition:'transform .2s' }}/>
+              </button>
+
+              {detailsOpen && (
+                <div className="fade-up">
+                  {categories.map(([label, iconName], i) => {
+                    const IC = Icon[iconName] || Icon.Star;
+                    const rated = catRatings[label] > 0;
+                    return (
+                      <div key={label} style={{
+                        display:'flex', alignItems:'center', justifyContent:'space-between',
+                        padding:'14px 4px', borderBottom: i<categories.length-1 ? '1px solid var(--border)' : 'none',
+                        flexWrap:'wrap', gap:10,
+                      }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:11 }}>
+                          <div style={{
+                            width:34, height:34, borderRadius:10, flexShrink:0,
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                            background: rated ? 'linear-gradient(135deg,var(--pink),var(--pink-bright))' : 'var(--pink-light)',
+                            transition:'all .2s',
+                          }}>
+                            <IC size={15} style={{ color: rated ? '#fff' : 'var(--pink)' }}/>
+                          </div>
+                          <div style={{ fontSize:13.5, fontWeight:600, color:'var(--text)' }}>{label}</div>
+                        </div>
+                        <StarRow value={catRatings[label]||0} onChange={v => setCatRating(label,v)} size={16}/>
+                      </div>
+                    );
+                  })}
+
+                  {/* Optional review text */}
+                  <div style={{ marginTop:18 }}>
+                    <textarea
+                      value={reviewText}
+                      onChange={e=>setReviewText(e.target.value)}
+                      rows={2}
+                      placeholder="Add a written review (optional)..."
+                      style={{
+                        background:'#f8f9fc',
+                        border:'1.5px solid var(--border-strong)',
+                        color:'var(--text)',
+                        resize:'none',
+                        fontSize:14,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

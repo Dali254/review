@@ -59,7 +59,7 @@ export default function Navbar({ user, onAuthClick, balance = 0 }) {
 
       <nav className="main-nav" style={{ background:'#fff', borderBottom:'1px solid #e8ecf0', height:60, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 24px', position:'sticky', top:0, zIndex:100, boxShadow:'0 1px 4px rgba(0,0,0,0.04)' }}>
         {/* Logo */}
-        <Link href="/" style={{ display:'flex', alignItems:'center', gap:10 }}>
+        <Link href="/businesses" style={{ display:'flex', alignItems:'center', gap:10 }}>
           <div style={{ width:34, height:34, borderRadius:10, background:'var(--brand-gradient)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'var(--shadow-glow-purple)' }}>
             <Icon.BarChart size={18} style={{ color:'#fff' }} />
           </div>
@@ -75,11 +75,9 @@ export default function Navbar({ user, onAuthClick, balance = 0 }) {
 
         {/* Desktop links */}
         <div className="nav-links">
-          {[{href:'/businesses',label:'Businesses'},{href:'/',label:'How It Works'}].map(l=>(
-            <Link key={l.href} href={l.href} style={{ padding:'7px 14px', borderRadius:8, fontSize:14, fontWeight:500, color: router.pathname===l.href ? 'var(--pink)' : 'var(--text-secondary)', background: router.pathname===l.href ? 'var(--pink-light)' : 'transparent', textDecoration:'none', transition:'all .15s' }}>
-              {l.label}
-            </Link>
-          ))}
+          <Link href="/businesses" style={{ padding:'7px 14px', borderRadius:8, fontSize:14, fontWeight:500, color: router.pathname==='/businesses' ? 'var(--pink)' : 'var(--text-secondary)', background: router.pathname==='/businesses' ? 'var(--pink-light)' : 'transparent', textDecoration:'none', transition:'all .15s' }}>
+            Businesses
+          </Link>
           <Link href="/wallet" style={{ padding:'7px 14px', borderRadius:8, fontSize:14, fontWeight:500, color: router.pathname==='/wallet' ? 'var(--pink)' : 'var(--text-secondary)', background: router.pathname==='/wallet' ? 'var(--pink-light)' : 'transparent', textDecoration:'none' }}>
             Wallet {user && balance > 0 && <span style={{ background:'var(--brand-gradient)', color:'#fff', fontSize:11, fontWeight:700, padding:'1px 7px', borderRadius:20, marginLeft:4 }}>{format(balance)}</span>}
           </Link>
@@ -107,7 +105,7 @@ export default function Navbar({ user, onAuthClick, balance = 0 }) {
 
       {/* Mobile bottom nav */}
       <nav className="mobile-nav" style={{ display:'flex' }}>
-        {[{href:'/',icon:'Home',label:'Home'},{href:'/businesses',icon:'Grid',label:'Browse'},{href:'/wallet',icon:'Wallet',label:'Wallet'}].map(l=>{
+        {[{href:'/businesses',icon:'Grid',label:'Browse'},{href:'/wallet',icon:'Wallet',label:'Wallet'}].map(l=>{
           const IC = Icon[l.icon];
           const active = router.pathname === l.href;
           return (

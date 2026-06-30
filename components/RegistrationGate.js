@@ -33,7 +33,7 @@ const SCAN_STEPS = [
 // _app.js in place of EVERY route when no user is signed in — there is
 // no homepage, no marketing page, and no way to click past it without
 // completing signup or logging in. See _app.js for the gate logic.
-export default function RegistrationGate({ onAuth }) {
+export default function RegistrationGate({ onAuth, onLogin }) {
   const [tab, setTab] = useState('signup');
   const [step, setStep] = useState('form'); // form | preference | scanning
   const [name, setName] = useState('');
@@ -60,7 +60,10 @@ export default function RegistrationGate({ onAuth }) {
       setStep('preference');
       return;
     }
-    onAuth({ name: 'Reviewer', phone: '0' + phone, email });
+    // Restores the existing account for this phone number (real name,
+    // plan, review preference) instead of creating a fresh placeholder —
+    // that's what makes "log in and continue where you left off" work.
+    onLogin(phone, { email });
   }
 
   function finishSignup() {

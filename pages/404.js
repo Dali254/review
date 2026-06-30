@@ -13,8 +13,8 @@ export default function NotFound() {
         <div style={{ fontSize:80, fontWeight:900, color:'var(--pink-mid)', lineHeight:1, marginBottom:16 }}>404</div>
         <h1 style={{ fontSize:22, fontWeight:800, marginBottom:10, color:'var(--text)' }}>Page not found</h1>
         <p style={{ color:'var(--text-secondary)', marginBottom:28, maxWidth:300, fontSize:14 }}>This page doesn't exist. Go back to reviewing Kenyan businesses.</p>
-        <Link href="/" style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'12px 24px', background:'var(--pink)', color:'#fff', borderRadius:12, fontWeight:700, fontSize:14, boxShadow:'0 4px 14px rgba(233,30,140,0.3)' }}>
-          <Icon.Home size={16}/>Back to ReviewKE
+        <Link href="/businesses" style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'12px 24px', background:'var(--brand-gradient)', color:'#fff', borderRadius:12, fontWeight:700, fontSize:14, boxShadow:'var(--shadow-glow-purple)' }}>
+          <Icon.Grid size={16}/>Back to ReviewKE
         </Link>
       </div>
     </>
