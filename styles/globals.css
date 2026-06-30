@@ -1,16 +1,30 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
+  /* Pink + purple brand palette */
   --pink: #C0185F;
   --pink-bright: #E91E8C;
   --pink-light: #FDEFF5;
   --pink-mid: #F9D2E5;
+  --purple: #7C3AED;
+  --purple-bright: #A855F7;
+  --purple-light: #F5F0FE;
+  --purple-mid: #E4D4FB;
+  --brand-gradient: linear-gradient(135deg, var(--purple) 0%, var(--pink-bright) 55%, var(--pink) 100%);
+  --brand-gradient-soft: linear-gradient(135deg, var(--purple-light) 0%, var(--pink-light) 100%);
+
   --green: #16A34A;
   --green-light: #F0FDF4;
   --gold: #F59E0B;
+
+  /* Text is ALWAYS one of these three on any light/white/tinted surface —
+     never inherited, never transparent-on-color. Forced black-ish tones
+     so text is legible everywhere. */
   --text: #14141f;
   --text-secondary: #5a5a6e;
   --text-muted: #8b8b9e;
+  --text-on-color: #ffffff; /* only for solid dark/gradient backgrounds */
+
   --bg: #ffffff;
   --bg-soft: #fafafb;
   --card: #ffffff;
@@ -22,6 +36,8 @@
   --shadow: 0 2px 8px rgba(20,20,31,0.06), 0 1px 2px rgba(20,20,31,0.04);
   --shadow-md: 0 8px 24px rgba(20,20,31,0.08), 0 2px 6px rgba(20,20,31,0.04);
   --shadow-lg: 0 20px 48px rgba(20,20,31,0.12), 0 4px 10px rgba(20,20,31,0.05);
+  --shadow-glow-pink: 0 8px 28px rgba(192,24,95,0.28);
+  --shadow-glow-purple: 0 8px 28px rgba(124,58,237,0.28);
 }
 
 html { scroll-behavior: smooth; }
@@ -40,6 +56,17 @@ button { cursor: pointer; font-family: inherit; }
 input, textarea, select { font-family: inherit; }
 img { max-width: 100%; display: block; }
 
+/* ── Text safety net ──
+   Every piece of body copy in this app should be readable. This rule
+   forces a solid, dark, legible color on text sitting on white/light
+   surfaces so nothing ever renders as invisible light-gray-on-white or
+   white-on-white. Components painting text onto a solid gradient/dark
+   background opt out explicitly with .text-on-color. */
+p, span, div, li, td, th, label {
+  color: inherit;
+}
+.text-on-color, .text-on-color * { color: var(--text-on-color) !important; }
+
 input, textarea {
   background: #fff;
   border: 1.5px solid var(--border-strong);
@@ -56,18 +83,28 @@ input, textarea {
 input:focus, textarea:focus { border-color: var(--pink); box-shadow: 0 0 0 3px rgba(192,24,95,0.10); }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
 
-/* Glassmorphism utility — used sparingly on hero/overlay surfaces over a colour or image */
+/* ── Glassmorphism ──
+   .glass: frosted white panel for use over the brand gradient or a photo.
+   .glass-card: a subtler frosted card for use on the plain white page
+   background — adds depth without sacrificing the white-background look. */
 .glass {
-  background: rgba(255,255,255,0.65);
+  background: rgba(255,255,255,0.72);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255,255,255,0.5);
+  border: 1px solid rgba(255,255,255,0.6);
 }
 .glass-dark {
   background: rgba(20,20,31,0.45);
   backdrop-filter: blur(16px) saturate(150%);
   -webkit-backdrop-filter: blur(16px) saturate(150%);
   border: 1px solid rgba(255,255,255,0.15);
+}
+.glass-card {
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(124,58,237,0.12);
+  box-shadow: var(--shadow-md);
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -80,5 +117,24 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .skeleton { background:linear-gradient(90deg,#f0f0f3 25%,#e6e6ec 50%,#f0f0f3 75%); background-size:200% 100%; animation:shimmer 1.6s infinite; border-radius:8px; }
 
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ── Celebration toast animations ── */
+@keyframes celebrate-in {
+  0%   { opacity:0; transform: translateY(24px) scale(0.9); }
+  60%  { opacity:1; transform: translateY(-4px) scale(1.03); }
+  100% { opacity:1; transform: translateY(0) scale(1); }
+}
+@keyframes celebrate-out {
+  to { opacity:0; transform: translateY(-16px) scale(0.95); }
+}
+@keyframes confetti-fall {
+  0%   { transform: translateY(-10px) rotate(0deg); opacity:1; }
+  100% { transform: translateY(140px) rotate(540deg); opacity:0; }
+}
+@keyframes badge-pop {
+  0%   { transform: scale(0.5) rotate(-10deg); }
+  60%  { transform: scale(1.15) rotate(4deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
 
 @media (max-width: 640px) { body { padding-bottom: 72px; } }

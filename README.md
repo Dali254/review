@@ -147,17 +147,33 @@ After adding env vars → **Redeploy** (Deployments tab → three dots → Redep
 
 ## API Keys Setup
 
-### Google Places API (for business photos)
+### Google Places API (for real business photos)
 
 1. Go to [console.cloud.google.com](https://console.cloud.google.com)
 2. Create a new project → **Enable these APIs**:
-   - Places API
-   - Maps JavaScript API
+   - **Places API** (required — this is the one used)
 3. Go to **Credentials → Create API Key**
-4. Restrict to your Vercel domain: `*.vercel.app`
-5. **Free tier**: 28,500 photo requests/month — more than enough
+4. Restrict the key:
+   - Under "API restrictions" → select **Places API**
+   - Under "Application restrictions" → **HTTP referrers** → add your Vercel domain (`*.vercel.app/*` and your custom domain if you have one)
+5. In Vercel, set the environment variable **`GOOGLE_PLACES_API_KEY`** to this key
+6. Redeploy
 
-> Without this key, the app still works — it shows colored logo placeholders instead of photos.
+**How this works:** `/api/place-photo.js` looks up each business by **name +
+address** (no pre-stored Place ID required) using Google's "Find Place from
+Text" endpoint, then proxies the actual photo bytes back to the browser. If
+Google has no photo for a business, or the key is missing/invalid, the
+endpoint returns no content and the `<img>` tag's `onError` handler falls
+back to `/api/logo` (the company's real logo, fetched from their domain) —
+so a business card is never blank, it just falls back gracefully through
+photo → logo → colored initial.
+
+**Free tier**: Places API gives 28,500 free text-search + photo requests per
+month, and every photo is cached for 30 days server-side, so a business's
+photo is only fetched from Google once even with heavy traffic.
+
+> Without this key, the app still works — every business shows its real
+> logo (via `/api/logo`, no key required) instead of a Google Maps photo.
 
 ### Anthropic API (for AI insights)
 

@@ -6,9 +6,14 @@ import AuthModal from '../../components/AuthModal';
 import UpgradeModal from '../../components/UpgradeModal';
 import { useUser } from '../../lib/useUser';
 import { useToast } from '../../lib/useToast';
+import { useCelebration } from '../../components/Celebration';
 import Icon from '../../lib/icons';
-import { getBizById, logoUrl, EARN_RATES } from '../../data/businesses';
-import { PUBLISH_FEE_KES } from '../../lib/config';
+import { getBizById, logoUrl, photoUrl, EARN_RATES } from '../../data/businesses';
+import { useCurrency } from '../../lib/CurrencyContext';
+
+const MIN_EARN = Math.min(...Object.values(EARN_RATES));
+const MAX_EARN = Math.max(...Object.values(EARN_RATES));
+import { PUBLISH_FEE_KES, SHARE_TARGET_COUNT } from '../../lib/config';
 import { recordFee, FEE_TYPES } from '../../lib/feeLedger';
 
 const RATING_CATEGORIES = {
@@ -89,16 +94,24 @@ export default function BusinessPage() {
 
   const { user, balance, login, addEarning, getRemainingTasks, consumeTask, upgradePro } = useUser();
   const { toast, Toast } = useToast();
+  const { celebrate, Celebration } = useCelebration();
+  const { format } = useCurrency();
   const [authOpen, setAuthOpen]     = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [stage, setStage]           = useState('detail'); // detail | rating | submitted
   const [catRatings, setCatRatings] = useState({});
   const [reviewText, setReviewText] = useState('');
   const [logoOk, setLogoOk]         = useState(true);
+  const [photoOk, setPhotoOk]       = useState(true);
   const [coverImg, setCoverImg]     = useState(true);
   const [reviews, setReviews]       = useState([]);
-  const [payStep, setPayStep]       = useState(null); // null | confirm | pending | success
+  const [payStep, setPayStep]       = useState(null); // null | confirm | pending | success | share
   const [payPhone, setPayPhone]     = useState('');
+  const [sharedCount, setSharedCount] = useState(0);
+  const [shareClicked, setShareClicked] = useState({}); // { [index]: true } once that tile's WhatsApp share opened
+
+  const isPro = user?.plan === 'pro';
+  const isGated = biz?.region === 'international' && !isPro;
 
   useEffect(() => {
     if (!biz) return;
@@ -107,6 +120,37 @@ export default function BusinessPage() {
   }, [biz?.id, user]);
 
   if (!biz) return null;
+
+  // International businesses are Pro-only. A non-Pro user who lands here
+  // via a direct link sees an upgrade prompt instead of the review flow.
+  if (isGated) {
+    return (
+      <>
+        <Head><title>{biz.name} — Pro members only — ReviewKE</title></Head>
+        <Navbar user={user} onAuthClick={()=>setAuthOpen(true)} balance={balance}/>
+        <main style={{ maxWidth:480, margin:'60px auto', padding:'0 20px 80px', textAlign:'center' }}>
+          <div className="glass-card" style={{ borderRadius:24, padding:'40px 28px' }}>
+            <div style={{ width:64, height:64, borderRadius:18, background:'var(--brand-gradient)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 18px', boxShadow:'var(--shadow-glow-purple)' }}>
+              <Icon.Globe size={28} style={{ color:'#fff' }}/>
+            </div>
+            <h1 style={{ fontSize:21, fontWeight:800, marginBottom:8, color:'var(--text)' }}>{biz.name} is a Pro review job</h1>
+            <p style={{ fontSize:14, color:'var(--text-secondary)', lineHeight:1.6, marginBottom:24 }}>
+              International brands like {biz.name} are reserved for Pro subscribers. Upgrade to unlock global review jobs and unlimited daily reviews.
+            </p>
+            <button onClick={() => { if (!user) { setAuthOpen(true); return; } setUpgradeOpen(true); }} style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'13px 28px', background:'var(--brand-gradient)', color:'#fff', border:'none', borderRadius:12, fontSize:15, fontWeight:700, cursor:'pointer', boxShadow:'var(--shadow-glow-purple)', marginBottom:12 }}>
+              <Icon.Zap size={16}/>{user ? 'Upgrade to Pro' : 'Sign in to continue'}
+            </button>
+            <div>
+              <button onClick={() => router.push('/businesses')} style={{ background:'none', border:'none', color:'var(--text-muted)', fontSize:13, cursor:'pointer' }}>Back to local businesses</button>
+            </div>
+          </div>
+        </main>
+        {upgradeOpen && user && <UpgradeModal user={user} onClose={()=>setUpgradeOpen(false)} onSuccess={() => { upgradePro(); setUpgradeOpen(false); toast('Pro plan activated! Reloading...','success'); setTimeout(()=>router.reload(), 800); }}/>}
+        {authOpen && <AuthModal onClose={()=>setAuthOpen(false)} onAuth={u=>{login(u);toast(`Welcome, ${u.name.split(' ')[0]}!`,'success');}}/>}
+        <Toast/>
+      </>
+    );
+  }
 
   const categories = RATING_CATEGORIES[biz.category] || RATING_CATEGORIES.Banking;
   const catKeys = categories.map(c => c[0]);
@@ -132,6 +176,7 @@ export default function BusinessPage() {
     if (PUBLISH_FEE_KES <= 0) {
       // Free to publish — credit immediately, no STK push needed
       addEarning(earn, `Review: ${biz.name}`);
+      celebrate(earn, `Your review for ${biz.name} is live`);
       setReviews(prev => [{ id:Date.now(), name:user.name, rating:avgRating, text:reviewText, date:'Just now', earned:earn, helpful:0 }, ...prev]);
       setStage('submitted');
       return;
@@ -139,6 +184,41 @@ export default function BusinessPage() {
     // Open payment confirmation — written review optional, payment is required to publish
     setPayPhone((user.phone||'').replace(/^0/,''));
     setPayStep('confirm');
+  }
+
+  // ── Share-to-unlock: free alternative to the M-Pesa verification fee ──
+  // The user shares their review link to SHARE_TARGET_COUNT WhatsApp
+  // groups/contacts instead of paying. We can't detect whether a message
+  // was actually sent inside WhatsApp (no API access to that), so each
+  // tile click opens the real WhatsApp share sheet for that slot and
+  // marks it complete once the user returns to the tab — this is an
+  // honest "I opened share #N" tracker, not a guarantee the message sent.
+  const reviewShareUrl = biz ? `${typeof window !== 'undefined' ? window.location.origin : ''}/business/${biz.id}` : '';
+  const shareMessage = biz ? `I just reviewed ${biz.name} on ReviewKE! Check it out and earn KES for your own reviews: ${reviewShareUrl}` : '';
+
+  function openWhatsAppShare(slotIndex) {
+    if (shareClicked[slotIndex]) return; // already used this slot
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
+    setShareClicked(prev => ({ ...prev, [slotIndex]: true }));
+    setSharedCount(prev => {
+      const next = Math.min(prev + 1, SHARE_TARGET_COUNT);
+      if (next === SHARE_TARGET_COUNT) {
+        toast('All shares complete — you can publish for free!', 'success');
+      }
+      return next;
+    });
+  }
+
+  function handlePublishViaShare() {
+    if (sharedCount < SHARE_TARGET_COUNT) return;
+    addEarning(earn, `Review: ${biz.name}`);
+    celebrate(earn, `Your review for ${biz.name} is live`);
+    setReviews(prev => [{ id:Date.now(), name:user.name, rating:avgRating, text:reviewText, date:'Just now', earned:earn, helpful:0 }, ...prev]);
+    setPayStep(null);
+    setStage('submitted');
+    setSharedCount(0);
+    setShareClicked({});
   }
 
   async function handlePay() {
@@ -182,6 +262,7 @@ export default function BusinessPage() {
 
       if (data.status === 'SUCCESS') {
         addEarning(earn, `Review: ${biz.name}`);
+        celebrate(earn, `Your review for ${biz.name} is live`);
         if (PUBLISH_FEE_KES > 0) {
           recordFee({
             type: FEE_TYPES.PUBLISH,
@@ -243,7 +324,7 @@ export default function BusinessPage() {
         </button>
         {avgRating > 0 && stage !== 'detail' && (
           <div style={{ background:'var(--pink-light)', color:'var(--pink)', fontWeight:800, fontSize:14, padding:'6px 14px', borderRadius:20 }}>
-            +KES {earn}.00
+            +{format(earn)}
           </div>
         )}
       </div>
@@ -252,15 +333,32 @@ export default function BusinessPage() {
         {/* ── STAGE 1: DETAIL ── */}
         {stage === 'detail' && (
           <div className="fade-up" style={{ background:'#fff', borderRadius:24, border:'1px solid var(--border)', overflow:'hidden', boxShadow:'var(--shadow-lg)' }}>
-            <div style={{ height:260, position:'relative', overflow:'hidden', background:`linear-gradient(135deg, ${biz.color}25, ${biz.color}08)`, display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <div style={{ position:'absolute', inset:0, backgroundImage:`radial-gradient(${biz.color}20 1.5px, transparent 1.5px)`, backgroundSize:'24px 24px' }}/>
-              {logoOk ? (
-                <img src={logoUrl(biz, 256)} alt={biz.name} onError={()=>setLogoOk(false)}
-                  style={{ width:120, height:120, objectFit:'contain', position:'relative', zIndex:1, borderRadius:24, background:'#fff', padding:20, boxShadow:'var(--shadow-md)' }}/>
+            <div style={{ height:260, position:'relative', overflow:'hidden', background: photoOk ? '#f1f5f9' : `linear-gradient(135deg, ${biz.color}25, ${biz.color}08)`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              {photoOk && (
+                <img
+                  src={photoUrl(biz, 1000)}
+                  alt=""
+                  onError={() => setPhotoOk(false)}
+                  style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover' }}
+                />
+              )}
+              {!photoOk && <div style={{ position:'absolute', inset:0, backgroundImage:`radial-gradient(${biz.color}20 1.5px, transparent 1.5px)`, backgroundSize:'24px 24px' }}/>}
+
+              {photoOk ? (
+                logoOk && (
+                  <div style={{ position:'absolute', bottom:18, left:18, width:64, height:64, borderRadius:16, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'var(--shadow-lg)', padding:10, zIndex:1 }}>
+                    <img src={logoUrl(biz,128)} alt={biz.name} onError={()=>setLogoOk(false)} style={{ width:'100%', height:'100%', objectFit:'contain' }}/>
+                  </div>
+                )
               ) : (
-                <div style={{ width:120, height:120, borderRadius:24, background:`linear-gradient(135deg,${biz.color},${biz.color}90)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:46, fontWeight:900, color:'#fff', position:'relative', zIndex:1, boxShadow:'var(--shadow-md)' }}>
-                  {biz.initial}
-                </div>
+                logoOk ? (
+                  <img src={logoUrl(biz, 256)} alt={biz.name} onError={()=>setLogoOk(false)}
+                    style={{ width:120, height:120, objectFit:'contain', position:'relative', zIndex:1, borderRadius:24, background:'#fff', padding:20, boxShadow:'var(--shadow-md)' }}/>
+                ) : (
+                  <div style={{ width:120, height:120, borderRadius:24, background:`linear-gradient(135deg,${biz.color},${biz.color}90)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:46, fontWeight:900, color:'#fff', position:'relative', zIndex:1, boxShadow:'var(--shadow-md)' }}>
+                    {biz.initial}
+                  </div>
+                )
               )}
               {biz.verified && (
                 <div style={{ position:'absolute', top:16, right:16, display:'flex', alignItems:'center', gap:5, background:'rgba(255,255,255,0.9)', backdropFilter:'blur(8px)', padding:'5px 12px', borderRadius:20, fontSize:11, fontWeight:700, color:'var(--green)', zIndex:1 }}>
@@ -290,7 +388,7 @@ export default function BusinessPage() {
                 </div>
                 <div style={{ background:'#f8f9fc', borderRadius:14, padding:'14px 16px' }}>
                   <div style={{ fontSize:12, color:'var(--text-muted)', marginBottom:6 }}>Earn per review</div>
-                  <div style={{ fontSize:17, fontWeight:800, color:'var(--green)' }}>KES 15–35</div>
+                  <div style={{ fontSize:17, fontWeight:800, color:'var(--green)' }}>{format(MIN_EARN)}–{format(MAX_EARN)}</div>
                 </div>
               </div>
 
@@ -305,10 +403,10 @@ export default function BusinessPage() {
               </div>
 
               <p style={{ fontSize:13, color:'var(--text-muted)', lineHeight:1.6, marginBottom:22 }}>
-                You'll rate {biz.name} on {categories.length} categories, then write an optional review. Submitting earns you up to KES {EARN_RATES[5]}.00.
+                You'll rate {biz.name} on {categories.length} categories, then write an optional review. Submitting earns you up to {format(EARN_RATES[5])}.
               </p>
 
-              <button onClick={startReview} style={{ width:'100%', padding:16, background:'linear-gradient(135deg,var(--pink),var(--pink-bright))', color:'#fff', border:'none', borderRadius:14, fontSize:16, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'0 8px 24px rgba(192,24,95,0.32)', transition:'transform .15s' }}>
+              <button onClick={startReview} style={{ width:'100%', padding:16, background:'var(--brand-gradient)', color:'#fff', border:'none', borderRadius:14, fontSize:16, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'var(--shadow-glow-purple)', transition:'transform .15s' }}>
                 Start Review <Icon.ArrowRight size={17}/>
               </button>
             </div>
@@ -319,7 +417,7 @@ export default function BusinessPage() {
         {stage === 'rating' && (
           <div className="fade-up" style={{ background:'#fff', borderRadius:24, border:'1px solid var(--border)', overflow:'hidden', boxShadow:'var(--shadow-lg)' }}>
             {/* Header band */}
-            <div style={{ padding:'26px 28px 22px', background:'linear-gradient(135deg, var(--pink-light) 0%, #fff 100%)', borderBottom:'1px solid var(--border)' }}>
+            <div style={{ padding:'26px 28px 22px', background:'var(--brand-gradient-soft)', borderBottom:'1px solid var(--border)' }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
                 <div>
                   <h2 style={{ fontSize:21, fontWeight:800, marginBottom:4 }}>Rate Your Experience</h2>
@@ -329,7 +427,7 @@ export default function BusinessPage() {
                   <div style={{ display:'flex', alignItems:'center', gap:8, background:'#fff', border:'1.5px solid var(--pink-mid)', borderRadius:14, padding:'8px 16px', boxShadow:'var(--shadow)' }}>
                     <Icon.TrendingUp size={15} style={{ color:'var(--pink)' }}/>
                     <span style={{ fontSize:13, color:'var(--text-secondary)' }}>You'll earn</span>
-                    <span style={{ fontSize:18, fontWeight:800, color:'var(--pink)' }}>KES {earn}</span>
+                    <span style={{ fontSize:18, fontWeight:800, color:'var(--pink)' }}>{format(earn)}</span>
                   </div>
                 )}
               </div>
@@ -401,7 +499,7 @@ export default function BusinessPage() {
                 boxShadow: allRated ? '0 8px 24px rgba(192,24,95,0.32)' : 'none',
                 transition:'all .2s',
               }}>
-                {allRated ? `Continue — Earn KES ${earn}` : `Rate all ${categories.length} categories to continue`}
+                {allRated ? `Continue — Earn ${format(earn)}` : `Rate all ${categories.length} categories to continue`}
                 <Icon.ArrowRight size={17}/>
               </button>
             </div>
@@ -416,12 +514,12 @@ export default function BusinessPage() {
             </div>
             <h3 style={{ fontSize:23, fontWeight:800, marginBottom:10 }}>Review Submitted!</h3>
             <p style={{ fontSize:15, color:'var(--text-secondary)', marginBottom:6 }}>
-              <strong style={{ color:'var(--pink)' }}>+KES {earn}.00</strong> has been added to your balance.
+              <strong style={{ color:'var(--pink)' }}>+{format(earn)}</strong> has been added to your balance.
             </p>
             <p style={{ fontSize:13, color:'var(--text-muted)', marginBottom:32 }}>
-              {(reviews.filter(r=>r.name===user?.name).length)} reviews · KES {balance.toLocaleString()} available to withdraw
+              {(reviews.filter(r=>r.name===user?.name).length)} reviews · {format(balance)} available to withdraw
             </p>
-            <button onClick={resetForAnother} style={{ width:'100%', padding:15, background:'var(--pink)', color:'#fff', border:'none', borderRadius:14, fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:10, boxShadow:'0 6px 20px rgba(192,24,95,0.3)' }}>
+            <button onClick={resetForAnother} style={{ width:'100%', padding:15, background:'var(--brand-gradient)', color:'#fff', border:'none', borderRadius:14, fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:10, boxShadow:'var(--shadow-glow-pink)' }}>
               Continue to Next Review <Icon.ArrowRight size={16}/>
             </button>
             <button onClick={() => router.push('/wallet')} style={{ width:'100%', padding:15, background:'#fff', color:'var(--pink)', border:'1.5px solid var(--pink-mid)', borderRadius:14, fontSize:15, fontWeight:700, cursor:'pointer', marginBottom:14 }}>
@@ -479,7 +577,7 @@ export default function BusinessPage() {
                   </div>
                   <h3 style={{ fontSize:19, fontWeight:800, marginBottom:8 }}>Verify your phone number</h3>
                   <p style={{ fontSize:13, color:'var(--text-secondary)', lineHeight:1.6, maxWidth:320, margin:'0 auto' }}>
-                    To prevent fake reviews, we confirm a small KES {PUBLISH_FEE_KES} charge via M-Pesa before publishing. You'll then earn <strong style={{ color:'var(--pink)' }}>KES {earn}.00</strong>.
+                    To prevent fake reviews, we confirm a small {format(PUBLISH_FEE_KES)} charge via M-Pesa before publishing. You'll then earn <strong style={{ color:'var(--pink)' }}>{format(earn)}</strong>.
                   </p>
                 </div>
                 <label style={{ display:'block', fontSize:12, fontWeight:600, color:'var(--text-secondary)', marginBottom:8 }}>M-Pesa number</label>
@@ -487,12 +585,101 @@ export default function BusinessPage() {
                   <span style={{ padding:'0 14px', fontWeight:700, color:'var(--pink)', borderRight:'1.5px solid var(--border)', whiteSpace:'nowrap', fontSize:14, display:'flex', alignItems:'center' }}>+254</span>
                   <input value={payPhone} onChange={e=>setPayPhone(e.target.value.replace(/\D/g,'').slice(0,9))} placeholder="712345678" type="tel" inputMode="numeric" style={{ border:'none', borderRadius:0, flex:1 }}/>
                 </div>
-                <button onClick={handlePay} style={{ width:'100%', padding:14, background:'var(--pink)', color:'#fff', border:'none', borderRadius:12, fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'0 4px 16px rgba(192,24,95,0.3)', marginBottom:10 }}>
-                  <Icon.Smartphone size={16}/>Pay KES {PUBLISH_FEE_KES} & Publish
+                <button onClick={handlePay} style={{ width:'100%', padding:14, background:'var(--brand-gradient)', color:'#fff', border:'none', borderRadius:12, fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'var(--shadow-glow-purple)', marginBottom:10 }}>
+                  <Icon.Smartphone size={16}/>Pay {format(PUBLISH_FEE_KES)} & Publish
+                </button>
+                <button onClick={() => setPayStep('share')} style={{ width:'100%', padding:13, background:'#f0fdf4', border:'1.5px solid #bbf7d0', borderRadius:12, fontSize:14, fontWeight:700, color:'var(--green)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:10 }}>
+                  <Icon.Send size={15}/>Don't want to pay? Share to {SHARE_TARGET_COUNT} WhatsApp groups instead
                 </button>
                 <button onClick={() => setPayStep(null)} style={{ width:'100%', padding:11, background:'transparent', border:'1.5px solid var(--border)', borderRadius:12, fontSize:14, color:'var(--text-muted)', cursor:'pointer' }}>Cancel</button>
               </>
             )}
+
+            {payStep === 'share' && (() => {
+              const pct = Math.round((sharedCount / SHARE_TARGET_COUNT) * 100);
+              const complete = sharedCount >= SHARE_TARGET_COUNT;
+              return (
+                <>
+                  <div style={{ textAlign:'center', marginBottom:20 }}>
+                    <div style={{ width:60, height:60, borderRadius:16, background:'#f0fdf4', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px' }}>
+                      <Icon.Send size={26} style={{ color:'var(--green)' }}/>
+                    </div>
+                    <h3 style={{ fontSize:19, fontWeight:800, marginBottom:8 }}>Share to unlock — free publish</h3>
+                    <p style={{ fontSize:13, color:'var(--text-secondary)', lineHeight:1.6, maxWidth:340, margin:'0 auto' }}>
+                      Tap each tile below to share your review link to a WhatsApp group or contact. Once all {SHARE_TARGET_COUNT} are done, publish for free and earn <strong style={{ color:'var(--pink)' }}>{format(earn)}</strong>.
+                    </p>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div style={{ marginBottom:18 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                      <span style={{ fontSize:12, fontWeight:700, color:'var(--text-secondary)' }}>{sharedCount} of {SHARE_TARGET_COUNT} shared</span>
+                      <span style={{ fontSize:13, fontWeight:800, color: complete ? 'var(--green)' : 'var(--purple)' }}>{pct}%</span>
+                    </div>
+                    <div style={{ height:10, background:'#f1f5f9', borderRadius:6, overflow:'hidden' }}>
+                      <div style={{
+                        width:`${pct}%`, height:'100%', borderRadius:6,
+                        background: complete ? 'linear-gradient(90deg, #16A34A, #22c55e)' : 'var(--brand-gradient)',
+                        transition:'width .3s ease',
+                      }}/>
+                    </div>
+                  </div>
+
+                  {/* 10-tile share grid */}
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:8, marginBottom:20 }}>
+                    {Array.from({ length: SHARE_TARGET_COUNT }, (_, i) => {
+                      const done = !!shareClicked[i];
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => openWhatsAppShare(i)}
+                          disabled={done}
+                          title={done ? `Group ${i+1} shared` : `Share to group ${i+1}`}
+                          style={{
+                            aspectRatio:'1', borderRadius:10, border:'none',
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                            background: done ? '#22c55e' : '#f0fdf4',
+                            cursor: done ? 'default' : 'pointer',
+                            transition:'all .2s',
+                            boxShadow: done ? '0 2px 8px rgba(34,197,94,0.3)' : 'none',
+                          }}
+                        >
+                          {done ? <Icon.Check size={18} style={{ color:'#fff' }}/> : <Icon.Send size={15} style={{ color:'var(--green)' }}/>}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div style={{ display:'flex', alignItems:'flex-start', gap:7, background:'#f8f9fc', border:'1px solid var(--border)', borderRadius:10, padding:'10px 12px', marginBottom:18 }}>
+                    <Icon.Info size={13} style={{ color:'var(--text-muted)', marginTop:1, flexShrink:0 }}/>
+                    <span style={{ fontSize:11.5, color:'var(--text-muted)', lineHeight:1.5 }}>
+                      Each tile opens WhatsApp with your review link pre-filled. Pick a different group or contact each time — sharing the same chat repeatedly won't help spread real reviews.
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={handlePublishViaShare}
+                    disabled={!complete}
+                    style={{
+                      width:'100%', padding:14, borderRadius:12, border:'none',
+                      background: complete ? 'linear-gradient(135deg,#16A34A,#22c55e)' : '#eceef3',
+                      color: complete ? '#fff' : 'var(--text-muted)',
+                      fontSize:15, fontWeight:700,
+                      cursor: complete ? 'pointer' : 'not-allowed',
+                      display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                      boxShadow: complete ? '0 8px 24px rgba(34,197,94,0.32)' : 'none',
+                      marginBottom:10, transition:'all .2s',
+                    }}
+                  >
+                    <Icon.CheckCircle size={16}/>
+                    {complete ? `Publish for free — Earn ${format(earn)}` : `Share to all ${SHARE_TARGET_COUNT} to unlock`}
+                  </button>
+                  <button onClick={() => setPayStep('confirm')} style={{ width:'100%', padding:11, background:'transparent', border:'1.5px solid var(--border)', borderRadius:12, fontSize:14, color:'var(--text-muted)', cursor:'pointer' }}>
+                    Back to payment option
+                  </button>
+                </>
+              );
+            })()}
 
             {payStep === 'pending' && (
               <div style={{ textAlign:'center', padding:'24px 0' }}>
@@ -509,7 +696,7 @@ export default function BusinessPage() {
                 </div>
                 <h3 style={{ fontSize:19, fontWeight:800, color:'var(--green)', marginBottom:8 }}>Verified!</h3>
                 <p style={{ color:'var(--text-secondary)', fontSize:14, marginBottom:22 }}>Publishing your review now...</p>
-                <button onClick={finishFlow} style={{ padding:'11px 30px', background:'var(--pink)', color:'#fff', border:'none', borderRadius:12, fontSize:14, fontWeight:700, cursor:'pointer' }}>Continue</button>
+                <button onClick={finishFlow} style={{ padding:'11px 30px', background:'var(--brand-gradient)', color:'#fff', border:'none', borderRadius:12, fontSize:14, fontWeight:700, cursor:'pointer', boxShadow:'var(--shadow-glow-pink)' }}>Continue</button>
               </div>
             )}
 
@@ -522,7 +709,7 @@ export default function BusinessPage() {
                 <p style={{ color:'var(--text-secondary)', fontSize:14, marginBottom:22, lineHeight:1.6 }}>
                   We didn't receive your M-Pesa confirmation. Your review was not published and no earnings were added.
                 </p>
-                <button onClick={() => setPayStep('confirm')} style={{ width:'100%', padding:13, background:'var(--pink)', color:'#fff', border:'none', borderRadius:12, fontSize:14, fontWeight:700, cursor:'pointer', marginBottom:10 }}>Try again</button>
+                <button onClick={() => setPayStep('confirm')} style={{ width:'100%', padding:13, background:'var(--brand-gradient)', color:'#fff', border:'none', borderRadius:12, fontSize:14, fontWeight:700, cursor:'pointer', marginBottom:10 }}>Try again</button>
                 <button onClick={() => setPayStep(null)} style={{ width:'100%', padding:11, background:'transparent', border:'1.5px solid var(--border)', borderRadius:12, fontSize:14, color:'var(--text-muted)', cursor:'pointer' }}>Cancel</button>
               </div>
             )}
@@ -533,6 +720,7 @@ export default function BusinessPage() {
       {upgradeOpen && <UpgradeModal user={user} onClose={()=>setUpgradeOpen(false)} onSuccess={() => { upgradePro(); setUpgradeOpen(false); toast('Pro plan activated!','success'); }}/>}
       {authOpen && <AuthModal onClose={()=>setAuthOpen(false)} onAuth={u=>{login(u);toast(`Welcome, ${u.name.split(' ')[0]}!`,'success');setStage('rating');}}/>}
       <Toast/>
+      <Celebration/>
     </>
   );
 }

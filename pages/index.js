@@ -6,25 +6,31 @@ import AuthModal from '../components/AuthModal';
 import { useUser } from '../lib/useUser';
 import { useToast } from '../lib/useToast';
 import Icon from '../lib/icons';
-import { BUSINESSES, logoUrl } from '../data/businesses';
+import { BUSINESSES, logoUrl, photoUrl, EARN_RATES } from '../data/businesses';
+import { useCurrency } from '../lib/CurrencyContext';
+import { WITHDRAWAL_TAX_RATE } from '../lib/config';
+
+const MIN_EARN = Math.min(...Object.values(EARN_RATES));
+const MAX_EARN = Math.max(...Object.values(EARN_RATES));
 
 const FEATURED = BUSINESSES.filter(b => b.featured).slice(0, 4);
 
-const STEPS = [
+const STEPS_BASE = [
   { icon:'Grid', title:'Browse businesses', desc:'50+ real Kenyan companies across 13 categories.' },
   { icon:'Star', title:'Rate with stars', desc:'Give a 1–5 star rating. Written review is optional.' },
-  { icon:'Smartphone', title:'Earn via M-Pesa', desc:'KES 15–35 credited instantly. 16% tax on withdrawal.' },
+  { icon:'Smartphone', title:'Earn via M-Pesa', desc:null }, // desc filled in dynamically with live currency
 ];
 
-const STATS = [
+const STATS_BASE = [
   { val:'50+', lbl:'Businesses', icon:'Building' },
   { val:'12K+', lbl:'Reviews', icon:'Star' },
-  { val:'KES 2M+', lbl:'Paid out', icon:'TrendingUp' },
+  { val:null, lbl:'Paid out', icon:'TrendingUp' }, // val filled in dynamically with live currency
   { val:'16%', lbl:'Tax on withdrawal', icon:'Shield' },
 ];
 
 function FeaturedCard({ biz }) {
   const [logoOk, setLogoOk] = useState(true);
+  const [photoOk, setPhotoOk] = useState(true);
   const seed = biz.id.charCodeAt(0) + biz.id.charCodeAt(biz.id.length-1);
   const reviewCount = 200 + (seed * 37) % 4600;
   const displayRating = (2.8 + ((seed * 13) % 22) / 10).toFixed(1);
@@ -34,13 +40,32 @@ function FeaturedCard({ biz }) {
       <div style={{ background:'#fff', borderRadius:16, border:'1px solid var(--border)', overflow:'hidden', boxShadow:'var(--shadow)', transition:'all .2s' }}
         onMouseEnter={e=>{e.currentTarget.style.boxShadow='var(--shadow-lg)';e.currentTarget.style.transform='translateY(-2px)';}}
         onMouseLeave={e=>{e.currentTarget.style.boxShadow='var(--shadow)';e.currentTarget.style.transform='translateY(0)';}}>
-        <div style={{ height:120, background:`linear-gradient(135deg,${biz.color}1a,${biz.color}06)`, display:'flex', alignItems:'center', justifyContent:'center', position:'relative', overflow:'hidden', padding:'16px' }}>
-          <div style={{ position:'absolute', inset:0, backgroundImage:`radial-gradient(${biz.color}18 1px,transparent 1px)`, backgroundSize:'18px 18px' }}/>
-          {logoOk ? (
-            <img src={logoUrl(biz,128)} alt={biz.name} onError={()=>setLogoOk(false)}
-              style={{ width:56, height:56, objectFit:'contain', position:'relative', zIndex:1, background:'#fff', borderRadius:12, padding:8, boxShadow:'var(--shadow)' }}/>
+        <div style={{ height:120, position:'relative', overflow:'hidden', background: photoOk ? '#f1f5f9' : `linear-gradient(135deg,${biz.color}1a,${biz.color}06)` }}>
+          {photoOk && (
+            <img
+              src={photoUrl(biz, 400)}
+              alt=""
+              onError={() => setPhotoOk(false)}
+              style={{ width:'100%', height:'100%', objectFit:'cover' }}
+            />
+          )}
+          {!photoOk && <div style={{ position:'absolute', inset:0, backgroundImage:`radial-gradient(${biz.color}18 1px,transparent 1px)`, backgroundSize:'18px 18px' }}/>}
+
+          {photoOk ? (
+            logoOk && (
+              <div style={{ position:'absolute', bottom:8, left:8, width:30, height:30, borderRadius:8, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'var(--shadow-md)', padding:5, zIndex:1 }}>
+                <img src={logoUrl(biz,60)} alt={biz.name} onError={()=>setLogoOk(false)} style={{ width:'100%', height:'100%', objectFit:'contain' }}/>
+              </div>
+            )
           ) : (
-            <div style={{ width:56, height:56, borderRadius:14, background:`linear-gradient(135deg,${biz.color},${biz.color}80)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, fontWeight:900, color:'#fff', position:'relative', zIndex:1 }}>{biz.initial}</div>
+            <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', padding:'16px' }}>
+              {logoOk ? (
+                <img src={logoUrl(biz,128)} alt={biz.name} onError={()=>setLogoOk(false)}
+                  style={{ width:56, height:56, objectFit:'contain', position:'relative', zIndex:1, background:'#fff', borderRadius:12, padding:8, boxShadow:'var(--shadow)' }}/>
+              ) : (
+                <div style={{ width:56, height:56, borderRadius:14, background:`linear-gradient(135deg,${biz.color},${biz.color}80)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, fontWeight:900, color:'#fff', position:'relative', zIndex:1 }}>{biz.initial}</div>
+              )}
+            </div>
           )}
         </div>
         <div style={{ padding:'14px 16px' }}>
@@ -59,7 +84,15 @@ function FeaturedCard({ biz }) {
 export default function Home() {
   const { user, balance, login } = useUser();
   const { toast, Toast } = useToast();
+  const { format } = useCurrency();
   const [authOpen, setAuthOpen] = useState(false);
+
+  const STEPS = STEPS_BASE.map((s, i) =>
+    i === 2 ? { ...s, desc: `${format(MIN_EARN)}–${format(MAX_EARN)} credited instantly. ${Math.round(WITHDRAWAL_TAX_RATE*100)}% tax on withdrawal.` } : s
+  );
+  const STATS = STATS_BASE.map((s, i) =>
+    i === 2 ? { ...s, val: `${format(2000000, { decimals: 0 })}+` } : s
+  );
 
   return (
     <>
@@ -90,10 +123,10 @@ export default function Home() {
             <span style={{ color:'var(--pink)' }}>Get Paid via M-Pesa.</span>
           </h1>
           <p style={{ fontSize:17, color:'var(--text-secondary)', maxWidth:480, margin:'0 auto 36px', lineHeight:1.65 }}>
-            Share your honest opinion on Safaricom, Equity Bank, Naivas and 47 more companies. Earn KES 15–35 instantly. No upfront fees.
+            Share your honest opinion on Safaricom, Equity Bank, Naivas and 47 more companies. Earn {format(MIN_EARN)}–{format(MAX_EARN)} instantly. No upfront fees.
           </p>
           <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
-            <Link href="/businesses" style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'14px 28px', borderRadius:12, background:'var(--pink)', color:'#fff', fontSize:15, fontWeight:700, textDecoration:'none', boxShadow:'0 4px 16px rgba(233,30,140,0.35)' }}>
+            <Link href="/businesses" style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'14px 28px', borderRadius:12, background:'var(--brand-gradient)', color:'#fff', fontSize:15, fontWeight:700, textDecoration:'none', boxShadow:'var(--shadow-glow-purple)' }}>
               <Icon.Grid size={17}/>Browse businesses
             </Link>
             <button onClick={()=>setAuthOpen(true)} style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'14px 28px', borderRadius:12, background:'#fff', color:'var(--text)', fontSize:15, fontWeight:600, border:'1.5px solid var(--border-strong)', cursor:'pointer', boxShadow:'var(--shadow)' }}>
@@ -104,12 +137,13 @@ export default function Home() {
 
         {/* STATS */}
         <div className="stats-grid" style={{ display:'grid', gap:14, marginBottom:56 }}>
-          {STATS.map(s => {
+          {STATS.map((s, idx) => {
             const IC = Icon[s.icon];
+            const isPurple = idx % 2 === 1;
             return (
-              <div key={s.val} style={{ background:'#fff', borderRadius:14, border:'1px solid var(--border)', padding:'20px 22px', display:'flex', alignItems:'center', gap:14, boxShadow:'var(--shadow)' }}>
-                <div style={{ width:42, height:42, borderRadius:12, background:'var(--pink-light)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                  <IC size={20} style={{ color:'var(--pink)' }}/>
+              <div key={s.val} className="glass-card" style={{ borderRadius:14, padding:'20px 22px', display:'flex', alignItems:'center', gap:14 }}>
+                <div style={{ width:42, height:42, borderRadius:12, background: isPurple ? 'var(--purple-light)' : 'var(--pink-light)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <IC size={20} style={{ color: isPurple ? 'var(--purple)' : 'var(--pink)' }}/>
                 </div>
                 <div>
                   <div style={{ fontSize:22, fontWeight:900, color:'var(--text)', lineHeight:1.1 }}>{s.val}</div>
@@ -124,17 +158,18 @@ export default function Home() {
         <div style={{ marginBottom:56 }}>
           <div style={{ marginBottom:28 }}>
             <div style={{ fontSize:11, fontWeight:800, color:'var(--pink)', textTransform:'uppercase', letterSpacing:'1.5px', marginBottom:8 }}>How it works</div>
-            <h2 style={{ fontSize:26, fontWeight:800 }}>Earn in three steps</h2>
+            <h2 style={{ fontSize:26, fontWeight:800, color:'var(--text)' }}>Earn in three steps</h2>
           </div>
           <div className="steps-grid" style={{ display:'grid', gap:16 }}>
             {STEPS.map((s,i) => {
               const IC = Icon[s.icon];
+              const isPurple = i % 2 === 1;
               return (
-                <div key={i} style={{ background:'#fff', borderRadius:16, border:'1px solid var(--border)', padding:'26px 24px', boxShadow:'var(--shadow)' }}>
-                  <div style={{ width:48, height:48, borderRadius:14, background:'var(--pink-light)', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:16 }}>
-                    <IC size={22} style={{ color:'var(--pink)' }}/>
+                <div key={i} className="glass-card" style={{ borderRadius:16, padding:'26px 24px' }}>
+                  <div style={{ width:48, height:48, borderRadius:14, background: isPurple ? 'var(--purple-light)' : 'var(--pink-light)', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:16 }}>
+                    <IC size={22} style={{ color: isPurple ? 'var(--purple)' : 'var(--pink)' }}/>
                   </div>
-                  <div style={{ fontSize:16, fontWeight:700, marginBottom:8 }}>{s.title}</div>
+                  <div style={{ fontSize:16, fontWeight:700, marginBottom:8, color:'var(--text)' }}>{s.title}</div>
                   <p style={{ fontSize:14, color:'var(--text-secondary)', lineHeight:1.6, margin:0 }}>{s.desc}</p>
                 </div>
               );
@@ -160,15 +195,15 @@ export default function Home() {
 
         {/* CTA */}
         {!user && (
-          <div style={{ background:'var(--pink)', borderRadius:20, padding:'48px 32px', textAlign:'center', position:'relative', overflow:'hidden' }}>
-            <div style={{ position:'absolute', top:-60, right:-60, width:200, height:200, background:'rgba(255,255,255,0.08)', borderRadius:'50%' }}/>
-            <div style={{ position:'absolute', bottom:-40, left:-40, width:160, height:160, background:'rgba(255,255,255,0.06)', borderRadius:'50%' }}/>
+          <div className="text-on-color" style={{ background:'var(--brand-gradient)', borderRadius:20, padding:'48px 32px', textAlign:'center', position:'relative', overflow:'hidden' }}>
+            <div style={{ position:'absolute', top:-60, right:-60, width:200, height:200, background:'rgba(255,255,255,0.12)', borderRadius:'50%' }}/>
+            <div style={{ position:'absolute', bottom:-40, left:-40, width:160, height:160, background:'rgba(255,255,255,0.08)', borderRadius:'50%' }}/>
             <Icon.Award size={40} style={{ color:'rgba(255,255,255,0.9)', marginBottom:14 }}/>
-            <h2 style={{ fontSize:26, fontWeight:800, color:'#fff', marginBottom:10 }}>Ready to start earning?</h2>
-            <p style={{ color:'rgba(255,255,255,0.8)', marginBottom:28, fontSize:15, lineHeight:1.6 }}>
+            <h2 style={{ fontSize:26, fontWeight:800, marginBottom:10 }}>Ready to start earning?</h2>
+            <p style={{ opacity:0.9, marginBottom:28, fontSize:15, lineHeight:1.6 }}>
               Join thousands of Kenyans earning from honest reviews. Free to join, paid via M-Pesa.
             </p>
-            <button onClick={()=>setAuthOpen(true)} style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'14px 32px', borderRadius:12, border:'none', background:'#fff', color:'var(--pink)', fontSize:15, fontWeight:800, cursor:'pointer', boxShadow:'0 4px 20px rgba(0,0,0,0.15)' }}>
+            <button onClick={()=>setAuthOpen(true)} style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'14px 32px', borderRadius:12, border:'none', background:'#fff', color:'var(--pink)', fontSize:15, fontWeight:800, cursor:'pointer', boxShadow:'0 4px 20px rgba(0,0,0,0.2)' }}>
               <Icon.ArrowRight size={16}/>Create free account
             </button>
           </div>
