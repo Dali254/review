@@ -22,19 +22,14 @@ const CAT_ICONS = {
 };
 
 export default function BusinessCard({ biz }) {
-  const [imgSrc, setImgSrc]       = useState(biz.imageUrl); // start with Unsplash
+  const [logoOk, setLogoOk]           = useState(true);
   const [googleRating, setGoogleRating] = useState(null);
-  const [imgLoaded, setImgLoaded] = useState(false);
 
   useEffect(() => {
     if (!biz.placeId) return;
-    // Try to get a better Google Places photo — if it works, replace Unsplash
     fetch(`/api/place-photo?placeId=${biz.placeId}`)
       .then(r => r.json())
-      .then(d => {
-        if (d.photoUrl) setImgSrc(d.photoUrl);
-        if (d.rating)   setGoogleRating(d.rating);
-      })
+      .then(d => { if (d.rating) setGoogleRating(d.rating); })
       .catch(() => {});
   }, [biz.placeId]);
 
@@ -58,40 +53,52 @@ export default function BusinessCard({ biz }) {
         }}
         onMouseEnter={e => {
           e.currentTarget.style.transform = 'translateY(-3px)';
-          e.currentTarget.style.background = 'rgba(255,255,255,0.07)';
           e.currentTarget.style.borderColor = 'rgba(0,200,83,0.3)';
           e.currentTarget.style.boxShadow = '0 16px 32px rgba(0,0,0,0.3)';
         }}
         onMouseLeave={e => {
           e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
           e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
           e.currentTarget.style.boxShadow = 'none';
         }}
       >
-        {/* Image */}
-        <div style={{ height: 148, position: 'relative', overflow: 'hidden', flexShrink: 0, background: `linear-gradient(135deg, ${biz.color}40 0%, ${biz.color}15 100%)` }}>
-          {imgSrc && (
+        {/* Logo panel — brand colour bg with centred logo */}
+        <div style={{
+          height: 130,
+          position: 'relative',
+          flexShrink: 0,
+          background: `linear-gradient(135deg, ${biz.color}30 0%, ${biz.logoBg || biz.color}18 100%)`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px 24px',
+        }}>
+          {biz.imageUrl && logoOk ? (
             <img
-              src={imgSrc}
-              alt={biz.name}
-              onLoad={() => setImgLoaded(true)}
-              onError={() => setImgSrc(null)} // remove broken image
-              style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.4s' }}
+              src={biz.imageUrl}
+              alt={`${biz.name} logo`}
+              onError={() => setLogoOk(false)}
+              style={{
+                maxWidth: '70%',
+                maxHeight: 72,
+                objectFit: 'contain',
+                filter: 'brightness(0) invert(1)',   /* make any logo white */
+                opacity: 0.92,
+              }}
             />
-          )}
-          {/* Always show logo in center if no image loaded yet */}
-          {!imgLoaded && (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ width: 60, height: 60, borderRadius: 16, background: `linear-gradient(135deg, ${biz.color}, ${biz.color}90)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 8px 24px ${biz.color}50` }}>
-                <span style={{ fontSize: 26, fontWeight: 800, color: '#fff' }}>{biz.initial}</span>
-              </div>
+          ) : (
+            <div style={{
+              width: 72, height: 72, borderRadius: 18,
+              background: `linear-gradient(135deg, ${biz.color}, ${biz.color}90)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: `0 8px 24px ${biz.color}50`,
+            }}>
+              <span style={{ fontSize: 30, fontWeight: 800, color: '#fff' }}>{biz.initial}</span>
             </div>
           )}
-          {/* Dark gradient overlay */}
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 55%)' }} />
-          {/* Category badge */}
-          <div style={{ position: 'absolute', top: 10, left: 10, display: 'flex', alignItems: 'center', gap: 5, padding: '3px 9px', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)', fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>
+
+          {/* Top badges */}
+          <div style={{ position: 'absolute', top: 10, left: 10, display: 'flex', alignItems: 'center', gap: 5, padding: '3px 9px', background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)', borderRadius: 20, border: '1px solid rgba(255,255,255,0.10)', fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>
             <CatIcon size={11} />{biz.category}
           </div>
           {biz.featured && (

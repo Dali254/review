@@ -161,20 +161,18 @@ export default function BusinessPage() {
   const [submitted, setSubmitted] = useState(false); // success state after publish
   const [showWritePanel, setShowWritePanel] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [logoImgOk, setLogoImgOk] = useState(true);
 
   useEffect(() => {
     if (!biz) return;
     setReviews(generateReviews(biz.id));
-    // Start with the Unsplash fallback so the hero is never blank
+    // Use the company logo from businesses data
     setPhoto(biz.imageUrl || null);
-    // Then try to upgrade to the real Google Places photo
+    // Fetch Google rating data (no photo needed now)
     if (biz.placeId) {
       fetch(`/api/place-photo?placeId=${biz.placeId}`)
         .then(r => r.json())
-        .then(d => {
-          if (d.photoUrl) setPhoto(d.photoUrl);
-          if (d.rating || d.totalRatings) setGoogleData(d);
-        })
+        .then(d => { if (d.rating || d.totalRatings) setGoogleData(d); })
         .catch(() => {});
     }
   }, [biz?.id]);
