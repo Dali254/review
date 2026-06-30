@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import Navbar from '../../components/Navbar';
 import AuthModal from '../../components/AuthModal';
 import UpgradeModal from '../../components/UpgradeModal';
-import { useUser } from '../../lib/useUser';
+import { useUser } from '../../lib/UserContext';
 import { useToast } from '../../lib/useToast';
 import { useCelebration } from '../../components/Celebration';
 import Icon from '../../lib/icons';
@@ -118,13 +118,70 @@ export default function BusinessPage() {
   const leftAtRef = useRef(null);
 
   const isPro = user?.plan === 'pro';
-  const isGated = biz?.region === 'international' && !isPro;
+  // A user's chosen region at signup is always free for them — no Pro
+  // gate, regardless of which region that is. Only the OTHER region (the
+  // one they didn't pick) requires Pro to access.
+  const homeRegion = user?.reviewPreference || 'local';
+  const isGated = biz && biz.region !== homeRegion && !isPro;
 
   useEffect(() => {
     if (!biz) return;
     setReviews(generateReviews(biz.id, biz.category));
     if (user) setPayPhone((user.phone||'').replace(/^0/,''));
   }, [biz?.id, user]);
+
+  // ── Share-to-unlock: free alternative to the M-Pesa verification fee ──
+  // The user shares their review link to SHARE_TARGET_COUNT WhatsApp
+  // groups/contacts instead of paying. We can't detect whether a message
+  // was actually sent inside WhatsApp (no API access to that), so each
+  // tile click opens the real WhatsApp share sheet for that slot and
+  // marks it complete once the user returns to the tab — this is an
+  // honest "I opened share #N" tracker, not a guarantee the message sent.
+  const reviewShareUrl = biz ? `${typeof window !== 'undefined' ? window.location.origin : ''}/business/${biz.id}` : '';
+  const shareMessage = biz ? `I just reviewed ${biz.name} on ReviewKE! Check it out and earn KES for your own reviews: ${reviewShareUrl}` : '';
+
+  const MIN_AWAY_MS = 8000; // must be away from the tab for at least 8s — long enough to actually pick a chat and send, short enough not to be annoying
+
+  // Detect the user coming back to this tab after we sent them to WhatsApp.
+  // Only counts the share complete if they were away long enough.
+  // IMPORTANT: this hook (and every hook above/below it) must run on every
+  // render regardless of whether `biz` exists or the business is Pro-gated.
+  // The two early returns that used to sit between hooks have been moved
+  // below this point — conditionally skipping hooks between renders is
+  // what throws React error #310 ("rendered fewer hooks than expected").
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState !== 'visible') return; // only care about returning
+      const slot = activeSlotRef.current;
+      const leftAt = leftAtRef.current;
+      if (slot === null || leftAt === null) return;
+
+      const awayMs = Date.now() - leftAt;
+      activeSlotRef.current = null;
+      leftAtRef.current = null;
+
+      if (awayMs < MIN_AWAY_MS) {
+        // Came back too fast — almost certainly didn't actually share.
+        setShareSlots(prev => ({ ...prev, [slot]: 'idle' }));
+        toast("That was quick — make sure you actually send the message in WhatsApp before coming back.", 'error');
+        return;
+      }
+
+      setShareSlots(prev => {
+        const updated = { ...prev, [slot]: 'done' };
+        const doneCount = Object.values(updated).filter(s => s === 'done').length;
+        setSharedCount(doneCount);
+        if (doneCount === SHARE_TARGET_COUNT) {
+          toast('All shares verified — you can publish for free!', 'success');
+        }
+        return updated;
+      });
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
+  // ── All hooks have now run. Early returns are safe from this point on. ──
 
   if (!biz) return null;
 
@@ -142,7 +199,7 @@ export default function BusinessPage() {
             </div>
             <h1 style={{ fontSize:21, fontWeight:800, marginBottom:8, color:'var(--text)' }}>{biz.name} is a Pro review job</h1>
             <p style={{ fontSize:14, color:'var(--text-secondary)', lineHeight:1.6, marginBottom:24 }}>
-              International brands like {biz.name} are reserved for Pro subscribers. Upgrade to unlock global review jobs and unlimited daily reviews.
+              {biz.region === 'international' ? 'International' : 'Local Kenyan'} brands like {biz.name} are outside your chosen review category. Upgrade to Pro to unlock both local and international jobs, plus unlimited daily reviews.
             </p>
             <button onClick={() => { if (!user) { setAuthOpen(true); return; } setUpgradeOpen(true); }} style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'13px 28px', background:'var(--brand-gradient)', color:'#fff', border:'none', borderRadius:12, fontSize:15, fontWeight:700, cursor:'pointer', boxShadow:'var(--shadow-glow-purple)', marginBottom:12 }}>
               <Icon.Zap size={16}/>{user ? 'Upgrade to Pro' : 'Sign in to continue'}
@@ -195,52 +252,6 @@ export default function BusinessPage() {
     setPayPhone((user.phone||'').replace(/^0/,''));
     setPayStep('confirm');
   }
-
-  // ── Share-to-unlock: free alternative to the M-Pesa verification fee ──
-  // The user shares their review link to SHARE_TARGET_COUNT WhatsApp
-  // groups/contacts instead of paying. We can't detect whether a message
-  // was actually sent inside WhatsApp (no API access to that), so each
-  // tile click opens the real WhatsApp share sheet for that slot and
-  // marks it complete once the user returns to the tab — this is an
-  // honest "I opened share #N" tracker, not a guarantee the message sent.
-  const reviewShareUrl = biz ? `${typeof window !== 'undefined' ? window.location.origin : ''}/business/${biz.id}` : '';
-  const shareMessage = biz ? `I just reviewed ${biz.name} on ReviewKE! Check it out and earn KES for your own reviews: ${reviewShareUrl}` : '';
-
-  const MIN_AWAY_MS = 8000; // must be away from the tab for at least 8s — long enough to actually pick a chat and send, short enough not to be annoying
-
-  // Detect the user coming back to this tab after we sent them to WhatsApp.
-  // Only counts the share complete if they were away long enough.
-  useEffect(() => {
-    function handleVisibility() {
-      if (document.visibilityState !== 'visible') return; // only care about returning
-      const slot = activeSlotRef.current;
-      const leftAt = leftAtRef.current;
-      if (slot === null || leftAt === null) return;
-
-      const awayMs = Date.now() - leftAt;
-      activeSlotRef.current = null;
-      leftAtRef.current = null;
-
-      if (awayMs < MIN_AWAY_MS) {
-        // Came back too fast — almost certainly didn't actually share.
-        setShareSlots(prev => ({ ...prev, [slot]: 'idle' }));
-        toast("That was quick — make sure you actually send the message in WhatsApp before coming back.", 'error');
-        return;
-      }
-
-      setShareSlots(prev => {
-        const updated = { ...prev, [slot]: 'done' };
-        const doneCount = Object.values(updated).filter(s => s === 'done').length;
-        setSharedCount(doneCount);
-        if (doneCount === SHARE_TARGET_COUNT) {
-          toast('All shares verified — you can publish for free!', 'success');
-        }
-        return updated;
-      });
-    }
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, []);
 
   function openWhatsAppShare(slotIndex) {
     if (shareSlots[slotIndex] === 'done' || shareSlots[slotIndex] === 'waiting') return; // already used or in progress

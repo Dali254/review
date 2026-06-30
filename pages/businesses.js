@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Navbar from '../components/Navbar';
 import AuthModal from '../components/AuthModal';
 import UpgradeModal from '../components/UpgradeModal';
-import { useUser } from '../lib/useUser';
+import { useUser } from '../lib/UserContext';
 import { useToast } from '../lib/useToast';
 import Icon from '../lib/icons';
 import { BUSINESSES, INTERNATIONAL_BUSINESSES, CATEGORIES, EARN_RATES, logoUrl, photoUrl, earnRateForBiz } from '../data/businesses';
@@ -59,7 +59,7 @@ function BusinessCard({ biz, onWriteReview, lockReason }) {
             <Icon.Shield size={22} style={{ color:'#fff' }}/>
           </div>
           <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:4 }}>Pro members only</div>
-          <div style={{ fontSize:12, color:'rgba(255,255,255,0.8)', marginBottom:14, maxWidth:200 }}>Upgrade to unlock international review jobs</div>
+          <div style={{ fontSize:12, color:'rgba(255,255,255,0.8)', marginBottom:14, maxWidth:200 }}>Upgrade to unlock {biz.region} review jobs</div>
           <span style={{ display:'inline-flex', alignItems:'center', gap:6, background:'#fff', color:'var(--purple)', fontSize:12, fontWeight:700, padding:'7px 16px', borderRadius:20 }}>
             <Icon.Zap size={12}/>Upgrade to Pro
           </span>
@@ -165,7 +165,7 @@ function BusinessCard({ biz, onWriteReview, lockReason }) {
 }
 
 export default function Businesses() {
-  const { user, balance, transactions, login, getRemainingTasks, DAILY_FREE_LIMIT, upgradePro, setReviewPreference, hasReviewed } = useUser();
+  const { user, balance, transactions, login, getRemainingTasks, DAILY_FREE_LIMIT, upgradePro, hasReviewed } = useUser();
   const { toast, Toast } = useToast();
   const { format } = useCurrency();
   const [authOpen, setAuthOpen]     = useState(false);
@@ -173,17 +173,21 @@ export default function Businesses() {
   const [category, setCategory]     = useState('All');
   const [search, setSearch]         = useState('');
 
-  // Which region's businesses to show. Defaults to the signed-in user's
-  // saved preference from signup; falls back to "local" for guests.
-  const [regionView, setRegionView] = useState(user?.reviewPreference || 'local');
+  // The region a user committed to at registration. This is permanent —
+  // RegistrationGate doesn't offer a "both" option anymore, so this is
+  // always 'local' or 'international'. Whatever they chose is free for
+  // them with no Pro upgrade required; it's simply their feed.
+  const homeRegion = user?.reviewPreference || 'local';
+  const [regionView, setRegionView] = useState(homeRegion);
 
   const isPro = user?.plan === 'pro';
+  // A region is "their own" if it matches what they picked at signup —
+  // always unlocked, never gated, regardless of Pro status. Viewing the
+  // OTHER region (the one they didn't choose) is what Pro unlocks.
+  const isOwnRegion = (region) => region === homeRegion;
 
   // Build the working set of businesses based on the region toggle.
-  const sourceBusinesses =
-    regionView === 'international' ? INTERNATIONAL_BUSINESSES :
-    regionView === 'both' ? [...BUSINESSES, ...INTERNATIONAL_BUSINESSES] :
-    BUSINESSES;
+  const sourceBusinesses = regionView === 'international' ? INTERNATIONAL_BUSINESSES : BUSINESSES;
 
   const catCounts = {};
   sourceBusinesses.forEach(b => { catCounts[b.category] = (catCounts[b.category]||0)+1; });
@@ -201,15 +205,18 @@ export default function Businesses() {
   function handleWriteReview(biz) {
     if (!user) { setAuthOpen(true); return; }
     if (hasReviewed(biz.id)) { toast('You already reviewed this business', 'error'); return; }
-    if (biz.region === 'international' && !isPro) { setUpgradeOpen(true); return; }
+    // Their own chosen region is always free — no Pro prompt, ever.
+    // Only the OTHER region (the one they didn't pick at signup) requires Pro.
+    if (!isOwnRegion(biz.region) && !isPro) { setUpgradeOpen(true); return; }
     if (remaining <= 0 && !isPro) { setUpgradeOpen(true); return; }
     window.location.href = `/business/${biz.id}`;
   }
 
   function changeRegionView(view) {
-    if (view === 'international' && !isPro) { setUpgradeOpen(true); return; }
+    // Switching to view your own chosen region is always free.
+    // Switching to the OTHER region requires Pro.
+    if (!isOwnRegion(view) && !isPro) { setUpgradeOpen(true); return; }
     setRegionView(view);
-    if (user) setReviewPreference(view);
   }
 
   return (
@@ -232,17 +239,17 @@ export default function Businesses() {
 
       <div className="page-layout">
         <aside className="sidebar">
-          {/* Region toggle: local / international / both */}
+          {/* Region toggle: your chosen region is always free; the other one needs Pro */}
           <div className="glass-card" style={{ borderRadius:18, padding:20, marginBottom:16 }}>
             <div style={{ fontSize:12, fontWeight:800, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:14 }}>Review Jobs</div>
             {[
               { id:'local', label:'Local businesses', icon:'MapPin', count: BUSINESSES.length },
-              { id:'international', label:'International', icon:'Globe', count: INTERNATIONAL_BUSINESSES.length, pro:true },
-              { id:'both', label:'Both', icon:'Grid', count: BUSINESSES.length + INTERNATIONAL_BUSINESSES.length },
+              { id:'international', label:'International', icon:'Globe', count: INTERNATIONAL_BUSINESSES.length },
             ].map(r => {
               const RC = Icon[r.icon];
               const active = regionView === r.id;
-              const locked = r.pro && !isPro;
+              const own = isOwnRegion(r.id);
+              const locked = !own && !isPro;
               return (
                 <button key={r.id} onClick={()=>changeRegionView(r.id)} style={{
                   width:'100%', display:'flex', alignItems:'center', gap:10,
@@ -251,7 +258,9 @@ export default function Businesses() {
                   cursor:'pointer', textAlign:'left',
                 }}>
                   <RC size={15} style={{ color: active ? 'var(--purple)' : 'var(--text-muted)', flexShrink:0 }}/>
-                  <span style={{ flex:1, fontSize:13, fontWeight: active?700:500, color: active ? 'var(--text)' : 'var(--text-secondary)' }}>{r.label}</span>
+                  <span style={{ flex:1, fontSize:13, fontWeight: active?700:500, color: active ? 'var(--text)' : 'var(--text-secondary)' }}>
+                    {r.label}{own && <span style={{ fontSize:9, fontWeight:800, color:'var(--green)', marginLeft:6, background:'#f0fdf4', padding:'1px 6px', borderRadius:20 }}>YOURS</span>}
+                  </span>
                   {locked && <Icon.Shield size={12} style={{ color:'#D97706' }}/>}
                   <span style={{ fontSize:11, fontWeight:700, color: active ? 'var(--purple)' : 'var(--text-muted)' }}>{r.count}</span>
                 </button>
@@ -259,7 +268,8 @@ export default function Businesses() {
             })}
             {!isPro && (
               <div style={{ marginTop:10, paddingTop:10, borderTop:'1px solid var(--border)', display:'flex', alignItems:'center', gap:6, fontSize:11, color:'var(--text-muted)' }}>
-                <Icon.Info size={11} style={{ flexShrink:0 }}/>International jobs need Pro
+                <Icon.Info size={11} style={{ flexShrink:0 }}/>
+                {homeRegion === 'international' ? 'Local jobs need Pro' : 'International jobs need Pro'}
               </div>
             )}
           </div>
@@ -338,7 +348,7 @@ export default function Businesses() {
         <div>
           <div style={{ marginBottom:22 }}>
             <h1 style={{ fontSize:22, fontWeight:800, marginBottom:4 }}>
-              {regionView === 'international' ? 'International Businesses' : regionView === 'both' ? 'All Review Jobs' : 'Kenyan Businesses'}
+              {regionView === 'international' ? 'International Businesses' : 'Kenyan Businesses'}
             </h1>
             <p style={{ color:'var(--text-secondary)', fontSize:14, marginBottom:16 }}>Showing <strong>{filtered.length}</strong> businesses — earn {format(MIN_EARN)}–{format(MAX_EARN)} per review</p>
             <div style={{ display:'flex', alignItems:'center', background:'#fff', border:'1.5px solid var(--border-strong)', borderRadius:10, overflow:'hidden', boxShadow:'var(--shadow)' }}>
@@ -351,12 +361,12 @@ export default function Businesses() {
           <div className="mobile-region-toggle" style={{ display:'none', gap:7, marginBottom:14, flexWrap:'wrap' }}>
             {[
               { id:'local', label:'Local', icon:'MapPin' },
-              { id:'international', label:'International', icon:'Globe', pro:true },
-              { id:'both', label:'Both', icon:'Grid' },
+              { id:'international', label:'International', icon:'Globe' },
             ].map(r => {
               const RC = Icon[r.icon];
               const active = regionView === r.id;
-              const locked = r.pro && !isPro;
+              const own = isOwnRegion(r.id);
+              const locked = !own && !isPro;
               return (
                 <button key={r.id} onClick={()=>changeRegionView(r.id)} style={{
                   display:'flex', alignItems:'center', gap:6,
@@ -389,7 +399,7 @@ export default function Businesses() {
           ) : (
             <div className="biz-grid">
               {filtered.map(biz => {
-                const lockReason = hasReviewed(biz.id) ? 'reviewed' : (biz.region === 'international' && !isPro) ? 'pro' : null;
+                const lockReason = hasReviewed(biz.id) ? 'reviewed' : (!isOwnRegion(biz.region) && !isPro) ? 'pro' : null;
                 return <BusinessCard key={biz.id} biz={biz} onWriteReview={handleWriteReview} lockReason={lockReason}/>;
               })}
             </div>

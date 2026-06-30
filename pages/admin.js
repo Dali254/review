@@ -2,7 +2,7 @@ import Head from 'next/head';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Navbar from '../components/Navbar';
-import { useUser } from '../lib/useUser';
+import { useUser } from '../lib/UserContext';
 import { useToast } from '../lib/useToast';
 import Icon from '../lib/icons';
 import { getFees, summarizeFees, clearFees, FEE_TYPES } from '../lib/feeLedger';

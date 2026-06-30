@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import Navbar from '../components/Navbar';
 import AuthModal from '../components/AuthModal';
-import { useUser } from '../lib/useUser';
+import { useUser } from '../lib/UserContext';
 import { useToast } from '../lib/useToast';
 import Icon from '../lib/icons';
 import { BUSINESSES, logoUrl, photoUrl, EARN_RATES } from '../data/businesses';
