@@ -2,6 +2,7 @@ import Head from 'next/head';
 import { useState } from 'react';
 import Link from 'next/link';
 import Navbar from '../components/Navbar';
+import InstallBanner from '../components/InstallBanner';
 import AuthModal from '../components/AuthModal';
 import UpgradeModal from '../components/UpgradeModal';
 import { useUser } from '../lib/UserContext';
@@ -356,6 +357,8 @@ export default function Businesses() {
               <input value={search} onChange={e=>setSearch(e.target.value)} placeholder={`Search ${category==='All'?'all businesses':category.toLowerCase()}...`} style={{ border:'none', borderRadius:0, padding:'12px 14px', fontSize:14, flex:1 }}/>
             </div>
           </div>
+
+          {user && <InstallBanner phone={user.phone} />}
 
           {/* Region toggle — visible on mobile/tablet where the sidebar is hidden */}
           <div className="mobile-region-toggle" style={{ display:'none', gap:7, marginBottom:14, flexWrap:'wrap' }}>

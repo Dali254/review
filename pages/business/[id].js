@@ -5,6 +5,7 @@ import Navbar from '../../components/Navbar';
 import AuthModal from '../../components/AuthModal';
 import UpgradeModal from '../../components/UpgradeModal';
 import { useUser } from '../../lib/UserContext';
+import { normalizePhone, isValidPhone } from '../../lib/useUser';
 import { useToast } from '../../lib/useToast';
 import { useCelebration } from '../../components/Celebration';
 import Icon from '../../lib/icons';
@@ -167,7 +168,7 @@ export default function BusinessPage() {
   useEffect(() => {
     if (!biz) return;
     setReviews(generateReviews(biz.id, biz.category));
-    if (user) setPayPhone((user.phone||'').replace(/^0/,''));
+    if (user) setPayPhone(user.phone || '');
   }, [biz?.id, user]);
 
   // ── Share-to-unlock: free alternative to the M-Pesa verification fee ──
@@ -301,7 +302,7 @@ export default function BusinessPage() {
       return;
     }
     // Open payment confirmation — written review optional, payment is required to publish
-    setPayPhone((user.phone||'').replace(/^0/,''));
+    setPayPhone(user.phone || '');
     setPayStep('confirm');
   }
 
@@ -329,7 +330,7 @@ export default function BusinessPage() {
   }
 
   async function handlePay() {
-    if (payPhone.length < 9) { toast('Enter your Safaricom number','error'); return; }
+    if (!isValidPhone(payPhone)) { toast('Enter a valid M-Pesa number','error'); return; }
     if (getRemainingTasks() <= 0) { setPayStep(null); setUpgradeOpen(true); return; }
     setPayStep('pending');
 
@@ -337,7 +338,7 @@ export default function BusinessPage() {
     try {
       const res = await fetch('/api/pay', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ phone:'0'+payPhone, amount:PUBLISH_FEE_KES, name:user.name, reference }),
+        body: JSON.stringify({ phone:normalizePhone(payPhone), amount:PUBLISH_FEE_KES, name:user.name, reference }),
       });
       const data = await res.json();
 
@@ -718,9 +719,9 @@ export default function BusinessPage() {
                   </p>
                 </div>
                 <label style={{ display:'block', fontSize:12, fontWeight:600, color:'var(--text-secondary)', marginBottom:8 }}>M-Pesa number</label>
-                <div style={{ display:'flex', alignItems:'center', background:'#fff', border:'1.5px solid var(--border-strong)', borderRadius:10, overflow:'hidden', marginBottom:20 }}>
-                  <span style={{ padding:'0 14px', fontWeight:700, color:'var(--pink)', borderRight:'1.5px solid var(--border)', whiteSpace:'nowrap', fontSize:14, display:'flex', alignItems:'center' }}>+254</span>
-                  <input value={payPhone} onChange={e=>setPayPhone(e.target.value.replace(/\D/g,'').slice(0,9))} placeholder="712345678" type="tel" inputMode="numeric" style={{ border:'none', borderRadius:0, flex:1 }}/>
+                <div style={{ display:'flex', alignItems:'center', background:'#fff', border:'1.5px solid var(--border-strong)', borderRadius:10, overflow:'hidden', marginBottom:20, padding:'0 4px 0 14px' }}>
+                  <Icon.Smartphone size={15} style={{ color:'var(--text-muted)', flexShrink:0 }}/>
+                  <input value={payPhone} onChange={e=>setPayPhone(e.target.value.replace(/[^\d+]/g,'').slice(0,13))} placeholder="0712345678" type="tel" inputMode="numeric" style={{ border:'none', borderRadius:0, flex:1, padding:'12px 10px' }}/>
                 </div>
                 <button onClick={handlePay} style={{ width:'100%', padding:14, background:'var(--brand-gradient)', color:'#fff', border:'none', borderRadius:12, fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'var(--shadow-glow-purple)', marginBottom:10 }}>
                   <Icon.Smartphone size={16}/>Pay {format(PUBLISH_FEE_KES)} & Publish
@@ -841,7 +842,7 @@ export default function BusinessPage() {
               <div style={{ textAlign:'center', padding:'24px 0' }}>
                 <div className="spinner" style={{ margin:'0 auto 22px' }}/>
                 <h3 style={{ fontSize:18, fontWeight:700, marginBottom:8 }}>Waiting for M-Pesa...</h3>
-                <p style={{ color:'var(--text-secondary)', fontSize:14 }}>Enter your PIN on +254 {payPhone}</p>
+                <p style={{ color:'var(--text-secondary)', fontSize:14 }}>Enter your PIN on +254 {normalizePhone(payPhone).slice(1)}</p>
               </div>
             )}
 

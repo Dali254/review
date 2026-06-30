@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Icon from '../lib/icons';
-import { PRO_PRICE_KES, DAILY_FREE_LIMIT } from '../lib/useUser';
+import { PRO_PRICE_KES, DAILY_FREE_LIMIT, normalizePhone, isValidPhone } from '../lib/useUser';
 import { EARN_RATES } from '../data/businesses';
 import { recordFee, FEE_TYPES } from '../lib/feeLedger';
 import { useCurrency } from '../lib/CurrencyContext';
@@ -10,18 +10,18 @@ const MAX_EARN = Math.max(...Object.values(EARN_RATES));
 
 export default function UpgradeModal({ user, onClose, onSuccess }) {
   const [step, setStep] = useState('plans'); // plans | phone | paying | success | failed
-  const [phone, setPhone] = useState((user?.phone || '').replace(/^0/, ''));
+  const [phone, setPhone] = useState(user?.phone || '');
   const { format } = useCurrency();
 
   async function startPayment() {
-    if (phone.length < 9) return;
+    if (!isValidPhone(phone)) return;
     setStep('paying');
     try {
       const res = await fetch('/api/pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phone: '0' + phone,
+          phone: normalizePhone(phone),
           amount: PRO_PRICE_KES,
           name: user?.name || 'Reviewer',
           reference: `RKE-PRO-${Date.now()}`,
@@ -124,11 +124,11 @@ export default function UpgradeModal({ user, onClose, onSuccess }) {
               <strong style={{ fontSize:18, color:'var(--purple)' }}>{format(PRO_PRICE_KES)}</strong>
             </div>
             <label style={{ display:'block', fontSize:12, fontWeight:600, color:'var(--text-secondary)', marginBottom:6 }}>M-Pesa number</label>
-            <div style={{ display:'flex', alignItems:'center', background:'#fff', border:'1.5px solid var(--border-strong)', borderRadius:10, overflow:'hidden', marginBottom:22 }}>
-              <span style={{ padding:'0 14px', fontWeight:700, color:'var(--pink)', borderRight:'1.5px solid var(--border)', whiteSpace:'nowrap', fontSize:14, display:'flex', alignItems:'center' }}>+254</span>
-              <input value={phone} onChange={e=>setPhone(e.target.value.replace(/\D/g,'').slice(0,9))} placeholder="712345678" type="tel" inputMode="numeric" style={{ border:'none', borderRadius:0, flex:1, color:'var(--text)' }}/>
+            <div style={{ display:'flex', alignItems:'center', background:'#fff', border:'1.5px solid var(--border-strong)', borderRadius:10, overflow:'hidden', marginBottom:22, padding:'0 4px 0 14px' }}>
+              <Icon.Smartphone size={15} style={{ color:'var(--text-muted)', flexShrink:0 }}/>
+              <input value={phone} onChange={e=>setPhone(e.target.value.replace(/[^\d+]/g,'').slice(0,13))} placeholder="0712345678" type="tel" inputMode="numeric" style={{ border:'none', borderRadius:0, flex:1, color:'var(--text)', padding:'12px 10px' }}/>
             </div>
-            <button onClick={startPayment} disabled={phone.length<9} style={{ width:'100%', padding:14, background: phone.length>=9 ? 'var(--brand-gradient)' : '#e2e8f0', color: phone.length>=9 ? '#fff' : 'var(--text-muted)', border:'none', borderRadius:12, fontSize:15, fontWeight:700, cursor: phone.length>=9?'pointer':'not-allowed', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow: phone.length>=9 ? 'var(--shadow-glow-purple)' : 'none' }}>
+            <button onClick={startPayment} disabled={!isValidPhone(phone)} style={{ width:'100%', padding:14, background: isValidPhone(phone) ? 'var(--brand-gradient)' : '#e2e8f0', color: isValidPhone(phone) ? '#fff' : 'var(--text-muted)', border:'none', borderRadius:12, fontSize:15, fontWeight:700, cursor: isValidPhone(phone)?'pointer':'not-allowed', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow: isValidPhone(phone) ? 'var(--shadow-glow-purple)' : 'none' }}>
               <Icon.Smartphone size={16}/>Send STK Push — {format(PRO_PRICE_KES)}
             </button>
             <p style={{ textAlign:'center', fontSize:11, color:'var(--text-muted)', marginTop:12 }}>Powered by PayHero · Secure M-Pesa STK Push</p>
@@ -140,7 +140,7 @@ export default function UpgradeModal({ user, onClose, onSuccess }) {
             <div className="spinner" style={{ margin:'0 auto 22px' }}/>
             <h3 style={{ fontSize:18, fontWeight:700, marginBottom:8, color:'var(--text)' }}>Check your phone</h3>
             <p style={{ color:'var(--text-secondary)', fontSize:14, lineHeight:1.6 }}>
-              An M-Pesa prompt was sent to <strong style={{ color:'var(--text)' }}>+254 {phone}</strong><br/>
+              An M-Pesa prompt was sent to <strong style={{ color:'var(--text)' }}>+254 {normalizePhone(phone).slice(1)}</strong><br/>
               Enter your PIN to complete the upgrade.
             </p>
           </div>

@@ -108,6 +108,65 @@ of the app uses, so swapping the storage backend is a contained change.
 
 ---
 
+## Installable app + push notifications (PWA)
+
+ReviewKE is a Progressive Web App: visitors can install it to their home
+screen like a native app, and get push notifications about new review
+jobs — including when the app is completely closed.
+
+**How install works:** the `public/manifest.json` file plus the icons in
+`public/icons/` make the site installable. On Android (Chrome/Edge) and
+desktop Chrome/Edge, the browser fires a native "Install app" prompt that
+`components/InstallBanner.js` captures and offers through its own button.
+On iOS Safari, there's no programmatic install prompt — users tap
+**Share → Add to Home Screen** manually; the banner detects iOS and shows
+those instructions instead.
+
+**How notifications work:** `public/sw.js` is a service worker that the
+browser keeps running independently of any open tab. When our server sends
+a push message (via the `web-push` library and VAPID keys), the OS wakes
+the service worker, which shows a native notification — this works even if
+the user closed every ReviewKE tab and isn't running the browser in the
+foreground. Tapping a notification opens (or focuses) the app at the
+linked page.
+
+**Sending notifications:** the admin dashboard (`/admin`) has a
+"Send notification" panel — write a title, message, and link, and it
+broadcasts to every subscribed user via `/api/push/send`. Useful for
+announcing new review jobs the moment they go live.
+
+**Platform support reality check:**
+- **Android (Chrome/Edge/Firefox/Samsung Internet):** full support — install + background push both work reliably, even with the browser fully closed.
+- **Desktop (Chrome/Edge/Firefox):** full support, same as Android.
+- **iOS Safari:** push notifications only work *after* the user installs
+  the PWA to their home screen (Settings → Add to Home Screen) — push
+  silently fails in a normal Safari tab. Requires iOS 16.4+. This is an
+  Apple platform restriction, not something fixable from the web app side.
+- A true native app submitted to the App Store would guarantee push on
+  iOS without the install step, but that's a separate React Native/Expo
+  project outside this Next.js codebase.
+
+**Important limitation — same pattern as the fee ledger and payment
+store:** `lib/pushStore.js` is an in-memory `Map`, which is not guaranteed
+to survive across requests on Vercel's serverless functions (each
+invocation can spin up a fresh container). It works in local dev and often
+across requests within a single warm container, but for production-grade
+reliability — where a subscription saved today must still work in a
+month — replace it with Vercel KV, Upstash Redis, or a database table
+keyed by phone number. `saveSubscription()` / `getSubscription()` /
+`getAllSubscriptions()` / `removeSubscription()` are the only functions
+the rest of the app calls, so the swap is contained to that one file.
+
+**Setup:** the VAPID keypair used to sign push messages is already
+generated and in `.env.local` as `NEXT_PUBLIC_VAPID_PUBLIC_KEY` and
+`VAPID_PRIVATE_KEY`. If you ever need to regenerate them (e.g. starting a
+new deployment from scratch), run:
+```bash
+npx web-push generate-vapid-keys
+```
+
+---
+
 ## Deploy to Vercel (free plan)
 
 ### Step 1 — Push to GitHub

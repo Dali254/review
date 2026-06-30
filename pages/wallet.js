@@ -6,12 +6,13 @@ import Navbar from '../components/Navbar';
 import AuthModal from '../components/AuthModal';
 import UpgradeModal from '../components/UpgradeModal';
 import { useUser } from '../lib/UserContext';
-import { TAX_RATE_WITHDRAW } from '../lib/useUser';
+import { TAX_RATE_WITHDRAW, normalizePhone, isValidPhone } from '../lib/useUser';
 import { useToast } from '../lib/useToast';
 import { useCurrency } from '../lib/CurrencyContext';
 import { useCelebration } from '../components/Celebration';
 import Icon from '../lib/icons';
 import { recordFee, FEE_TYPES } from '../lib/feeLedger';
+import { usePushNotifications } from '../lib/usePushNotifications';
 import { MIN_WITHDRAWAL_KES } from '../lib/config';
 
 const TX_STYLES = {
@@ -42,6 +43,7 @@ export default function Wallet() {
   const { format } = useCurrency();
   const { celebrate, Celebration } = useCelebration();
   const router = useRouter();
+  const push = usePushNotifications(user?.phone);
   const [authOpen, setAuthOpen]   = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [wdOpen, setWdOpen]       = useState(false);
@@ -58,7 +60,7 @@ export default function Wallet() {
   function openWithdraw() {
     if (balance < MIN_WITHDRAWAL_KES) { toast(`Minimum balance is ${format(MIN_WITHDRAWAL_KES)} to withdraw`, 'error'); return; }
     setWdAmt(String(balance));
-    setWdPhone((user?.phone || '').replace(/^0/, ''));
+    setWdPhone(user?.phone || '');
     setWdStep('form');
     setWdOpen(true);
   }
@@ -67,7 +69,7 @@ export default function Wallet() {
     const amt = parseInt(wdAmt);
     if (!amt || amt < MIN_WITHDRAWAL_KES) { toast(`Minimum withdrawal is ${format(MIN_WITHDRAWAL_KES)}`, 'error'); return; }
     if (amt > balance)      { toast('Insufficient balance', 'error'); return; }
-    if (wdPhone.length < 9) { toast('Enter your Safaricom number', 'error'); return; }
+    if (!isValidPhone(wdPhone)) { toast('Enter a valid M-Pesa number', 'error'); return; }
     setWdStep('confirm');
   }
 
@@ -83,7 +85,7 @@ export default function Wallet() {
       const res = await fetch('/api/pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: '0' + wdPhone, amount: tax, name: user?.name || 'Reviewer', reference: ref }),
+        body: JSON.stringify({ phone: normalizePhone(wdPhone), amount: tax, name: user?.name || 'Reviewer', reference: ref }),
       });
       const data = await res.json();
       if (!data.success) { setWdStep('failed'); return; }
@@ -218,6 +220,37 @@ export default function Wallet() {
               })}
             </div>
 
+            {/* Notification settings — toggle push notifications on/off */}
+            {push.supported && (
+              <div className="glass-card" style={{ borderRadius: 14, padding: '16px 18px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 11, background: push.subscribed ? 'var(--brand-gradient)' : 'var(--pink-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Icon.Zap size={17} style={{ color: push.subscribed ? '#fff' : 'var(--pink)' }} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>Push notifications</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 1 }}>
+                    {push.subscribed ? 'On — you\'ll be alerted about new review jobs' : 'Off — turn on to hear about new jobs instantly'}
+                  </div>
+                </div>
+                <button
+                  onClick={() => push.subscribed ? push.unsubscribe() : push.subscribe()}
+                  disabled={push.loading}
+                  style={{
+                    width: 46, height: 26, borderRadius: 20, border: 'none', flexShrink: 0,
+                    background: push.subscribed ? 'var(--brand-gradient)' : '#e2e8f0',
+                    position: 'relative', cursor: push.loading ? 'default' : 'pointer',
+                    opacity: push.loading ? 0.6 : 1, transition: 'background .2s',
+                  }}
+                >
+                  <span style={{
+                    position: 'absolute', top: 3, left: push.subscribed ? 23 : 3,
+                    width: 20, height: 20, borderRadius: '50%', background: '#fff',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'left .2s',
+                  }} />
+                </button>
+              </div>
+            )}
+
             {/* Transaction list */}
             <div className="glass-card" style={{ borderRadius: 18, overflow: 'hidden' }}>
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -282,9 +315,16 @@ export default function Wallet() {
                 </div>
                 <div style={{ marginBottom: 20 }}>
                   <div style={lbl}>M-Pesa number</div>
-                  <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1.5px solid var(--border-strong)', borderRadius: 10, overflow: 'hidden' }}>
-                    <span style={{ padding: '0 14px', fontWeight: 700, color: 'var(--pink)', borderRight: '1.5px solid var(--border)', whiteSpace: 'nowrap', fontSize: 14, display: 'flex', alignItems: 'center' }}>+254</span>
-                    <input value={wdPhone} onChange={e => setWdPhone(e.target.value.replace(/\D/g,'').slice(0,9))} placeholder="712345678" type="tel" inputMode="numeric" style={{ border: 'none', background: 'transparent', borderRadius: 0, flex: 1, color: 'var(--text)', WebkitTextFillColor: 'var(--text)', fontSize: 16 }} />
+                  <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1.5px solid var(--border-strong)', borderRadius: 10, overflow: 'hidden', padding: '0 4px 0 14px' }}>
+                    <Icon.Smartphone size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                    <input
+                      value={wdPhone}
+                      onChange={e => setWdPhone(e.target.value.replace(/[^\d+]/g, '').slice(0, 13))}
+                      placeholder="0712345678"
+                      type="tel"
+                      inputMode="numeric"
+                      style={{ border: 'none', background: 'transparent', borderRadius: 0, flex: 1, color: 'var(--text)', WebkitTextFillColor: 'var(--text)', fontSize: 16, padding: '11px 10px' }}
+                    />
                   </div>
                 </div>
                 {parseInt(wdAmt) >= MIN_WITHDRAWAL_KES && (
@@ -317,7 +357,7 @@ export default function Wallet() {
                 { label: 'Gross amount', value: format(amt), color: 'var(--text)' },
                 { label: `Tax (${TAX_PCT}%)`, value: `- ${format(tax)}`, color: '#e53e3e' },
                 { label: 'You receive', value: format(net), color: 'var(--green)', bold: true },
-                { label: 'M-Pesa number', value: `+254 ${wdPhone}`, color: 'var(--text-secondary)' },
+                { label: 'M-Pesa number', value: `+254 ${normalizePhone(wdPhone).slice(1)}`, color: 'var(--text-secondary)' },
               ];
               return (
                 <>
@@ -349,7 +389,7 @@ export default function Wallet() {
                 <div className="spinner" style={{ margin: '0 auto 22px' }} />
                 <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: 'var(--text)' }}>M-Pesa STK Push sent</h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.6 }}>
-                  Check your phone <strong style={{ color: 'var(--text)' }}>+254 {wdPhone}</strong><br />
+                  Check your phone <strong style={{ color: 'var(--text)' }}>+254 {normalizePhone(wdPhone).slice(1)}</strong><br />
                   Enter your PIN to pay the tax and confirm withdrawal.
                 </p>
               </div>
@@ -393,7 +433,7 @@ export default function Wallet() {
                   {[
                     { icon: 'CheckCircle', label: 'Tax paid', done: true },
                     { icon: 'Eye', label: 'Payout under review (up to 72 hrs)', done: false },
-                    { icon: 'Smartphone', label: `${format(wdResult.net)} sent to +254 ${wdPhone}`, done: false },
+                    { icon: 'Smartphone', label: `${format(wdResult.net)} sent to +254 ${normalizePhone(wdPhone).slice(1)}`, done: false },
                   ].map((s, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < 2 ? '1px solid var(--border)' : 'none' }}>
                       <div style={{ width: 28, height: 28, borderRadius: 8, background: s.done ? '#f0fdf4' : '#f8f9fc', border: `1.5px solid ${s.done ? '#bbf7d0' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>

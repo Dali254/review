@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Icon from '../lib/icons';
+import { normalizePhone, isValidPhone } from '../lib/useUser';
 
 const REVIEW_PREFERENCES = [
   {
@@ -53,10 +54,10 @@ export default function AuthModal({ onClose, onAuth }) {
     setError('');
     if (tab === 'signup') {
       if (!name.trim()) { setError('Enter your full name'); return false; }
-      if (phone.length < 9) { setError('Enter a valid phone number'); return false; }
+      if (!isValidPhone(phone)) { setError('Enter a valid M-Pesa number'); return false; }
       return true;
     }
-    if (phone.length < 9) { setError('Enter your phone number'); return false; }
+    if (!isValidPhone(phone)) { setError('Enter your M-Pesa number'); return false; }
     return true;
   }
 
@@ -68,7 +69,7 @@ export default function AuthModal({ onClose, onAuth }) {
       return;
     }
     // Login skips preference selection — it's only asked once, at signup
-    onAuth({ name: 'Reviewer', phone: '0' + phone, email });
+    onAuth({ name: 'Reviewer', phone: normalizePhone(phone), email });
     onClose();
   }
 
@@ -86,14 +87,14 @@ export default function AuthModal({ onClose, onAuth }) {
         if (phase >= SCAN_STEPS.length - 1) {
           clearInterval(interval);
           setTimeout(() => {
-            onAuth({ name: name.trim(), phone: '0' + phone, email, reviewPreference: preference });
+            onAuth({ name: name.trim(), phone: normalizePhone(phone), email, reviewPreference: preference });
             onClose();
           }, 900);
         }
       }, 750);
       return;
     }
-    onAuth({ name: name.trim(), phone: '0' + phone, email, reviewPreference: preference });
+    onAuth({ name: name.trim(), phone: normalizePhone(phone), email, reviewPreference: preference });
     onClose();
   }
 
@@ -137,10 +138,10 @@ export default function AuthModal({ onClose, onAuth }) {
                 </div>
               )}
               <div>
-                <label style={lbl}>Safaricom number</label>
-                <div style={{ display:'flex', background:'#fff', border:'1.5px solid var(--border-strong)', borderRadius:10, overflow:'hidden' }}>
-                  <span style={{ padding:'0 14px', fontWeight:700, color:'var(--pink)', borderRight:'1.5px solid var(--border)', whiteSpace:'nowrap', display:'flex', alignItems:'center', fontSize:14 }}>+254</span>
-                  <input value={phone} onChange={e=>setPhone(e.target.value.replace(/\D/g,'').slice(0,9))} placeholder="712 345 678" type="tel" inputMode="numeric" style={{ border:'none', borderRadius:0, flex:1, fontSize:16 }}/>
+                <label style={lbl}>M-Pesa number</label>
+                <div style={{ display:'flex', alignItems:'center', background:'#fff', border:'1.5px solid var(--border-strong)', borderRadius:10, overflow:'hidden', padding:'0 4px 0 14px' }}>
+                  <Icon.Smartphone size={15} style={{ color:'var(--text-muted)', flexShrink:0 }}/>
+                  <input value={phone} onChange={e=>setPhone(e.target.value.replace(/[^\d+]/g,'').slice(0,13))} placeholder="0712345678" type="tel" inputMode="numeric" style={{ border:'none', borderRadius:0, flex:1, fontSize:16, padding:'11px 10px' }}/>
                 </div>
               </div>
               {tab==='signup' && (

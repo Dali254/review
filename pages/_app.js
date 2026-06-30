@@ -42,8 +42,16 @@ export default function App(props) {
     <>
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="theme-color" content="#0d0118" />
+        <meta name="theme-color" content="#C0185F" />
         <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23C0185F'/><text y='.85em' font-size='68' x='50%' text-anchor='middle' fill='white'>R</text></svg>" />
+
+        {/* PWA: manifest + icons make the app installable to a home screen */}
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="ReviewKE" />
+        <meta name="mobile-web-app-capable" content="yes" />
       </Head>
       <CurrencyProvider>
         <UserProvider>

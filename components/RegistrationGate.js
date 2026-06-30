@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Icon from '../lib/icons';
+import { normalizePhone, isValidPhone } from '../lib/useUser';
 
 const REVIEW_PREFERENCES = [
   {
@@ -47,10 +48,10 @@ export default function RegistrationGate({ onAuth, onLogin }) {
     setError('');
     if (tab === 'signup') {
       if (!name.trim()) { setError('Enter your full name'); return false; }
-      if (phone.length < 9) { setError('Enter a valid phone number'); return false; }
+      if (!isValidPhone(phone)) { setError('Enter a valid M-Pesa number (07xx, 01xx, or 254xxx)'); return false; }
       return true;
     }
-    if (phone.length < 9) { setError('Enter your phone number'); return false; }
+    if (!isValidPhone(phone)) { setError('Enter your M-Pesa number (07xx, 01xx, or 254xxx)'); return false; }
     return true;
   }
 
@@ -67,6 +68,7 @@ export default function RegistrationGate({ onAuth, onLogin }) {
   }
 
   function finishSignup() {
+    const fullPhone = normalizePhone(phone);
     if (preference === 'international') {
       setStep('scanning');
       setScanPhase(0);
@@ -77,13 +79,13 @@ export default function RegistrationGate({ onAuth, onLogin }) {
         if (phase >= SCAN_STEPS.length - 1) {
           clearInterval(interval);
           setTimeout(() => {
-            onAuth({ name: name.trim(), phone: '0' + phone, email, reviewPreference: preference });
+            onAuth({ name: name.trim(), phone: fullPhone, email, reviewPreference: preference });
           }, 900);
         }
       }, 750);
       return;
     }
-    onAuth({ name: name.trim(), phone: '0' + phone, email, reviewPreference: preference });
+    onAuth({ name: name.trim(), phone: fullPhone, email, reviewPreference: preference });
   }
 
   return (
@@ -131,10 +133,21 @@ export default function RegistrationGate({ onAuth, onLogin }) {
                 </div>
               )}
               <div>
-                <label style={lbl}>Safaricom number</label>
-                <div style={{ display: 'flex', background: '#fff', border: '1.5px solid var(--border-strong)', borderRadius: 10, overflow: 'hidden' }}>
-                  <span style={{ padding: '0 14px', fontWeight: 700, color: 'var(--pink)', borderRight: '1.5px solid var(--border)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', fontSize: 14 }}>+254</span>
-                  <input value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 9))} placeholder="712 345 678" type="tel" inputMode="numeric" style={{ border: 'none', borderRadius: 0, flex: 1, fontSize: 16 }} />
+                <label style={lbl}>M-Pesa number</label>
+                <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1.5px solid var(--border-strong)', borderRadius: 10, overflow: 'hidden', padding: '0 4px 0 14px' }}>
+                  <Icon.Smartphone size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  <input
+                    value={phone}
+                    onChange={e => setPhone(e.target.value.replace(/[^\d+]/g, '').slice(0, 13))}
+                    placeholder="0712 345 678"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    style={{ border: 'none', borderRadius: 0, flex: 1, fontSize: 16, padding: '11px 10px' }}
+                  />
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>
+                  Accepts 07xx, 01xx, 254xx, or +254xx formats
                 </div>
               </div>
               {tab === 'signup' && (

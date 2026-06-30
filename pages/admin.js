@@ -38,6 +38,11 @@ export default function AdminDashboard() {
   const { user, balance } = useUser();
   const { toast, Toast } = useToast();
   const router = useRouter();
+  const [notifTitle, setNotifTitle] = useState('New review job available!');
+  const [notifBody, setNotifBody] = useState('A new business just opened for review on ReviewKE — tap to earn.');
+  const [notifUrl, setNotifUrl] = useState('/businesses');
+  const [sending, setSending] = useState(false);
+  const [subscriberCount, setSubscriberCount] = useState(null);
 
   const [unlocked, setUnlocked] = useState(false);
   const [pwInput, setPwInput] = useState('');
@@ -52,11 +57,38 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    if (unlocked) refreshFees();
+    if (unlocked) {
+      refreshFees();
+      fetch('/api/push/stats').then(r => r.json()).then(d => setSubscriberCount(d.subscribers)).catch(() => {});
+    }
   }, [unlocked]);
 
   function refreshFees() {
     setFees(getFees());
+  }
+
+  async function handleSendBroadcast() {
+    if (!notifTitle.trim() || !notifBody.trim()) {
+      toast('Title and message are required', 'error');
+      return;
+    }
+    setSending(true);
+    try {
+      const res = await fetch('/api/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ broadcast: true, title: notifTitle.trim(), body: notifBody.trim(), url: notifUrl || '/businesses' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast(`Sent to ${data.sent} of ${data.total} subscriber${data.total === 1 ? '' : 's'}`, 'success');
+      } else {
+        toast(data.reason || 'Failed to send notifications', 'error');
+      }
+    } catch {
+      toast('Failed to send notifications', 'error');
+    }
+    setSending(false);
   }
 
   function handleUnlock() {
@@ -195,6 +227,50 @@ export default function AdminDashboard() {
                 </div>
               );
             })}
+          </div>
+        </div>
+
+        {/* Push notifications — alert reviewers about new jobs even when the app is closed */}
+        <div style={{ marginBottom:28 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexWrap:'wrap', gap:8 }}>
+            <h2 style={{ fontSize:15, fontWeight:700 }}>Send notification</h2>
+            <span style={{ fontSize:11, color:'var(--text-muted)', display:'flex', alignItems:'center', gap:5 }}>
+              <Icon.Zap size={12} style={{ color:'var(--purple)' }}/>
+              {subscriberCount === null ? 'Loading...' : `${subscriberCount} subscriber${subscriberCount === 1 ? '' : 's'}`}
+            </span>
+          </div>
+          <div style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:16, padding:20, boxShadow:'var(--shadow)' }}>
+            <div style={{ display:'flex', alignItems:'flex-start', gap:8, background:'var(--purple-light)', border:'1px solid var(--purple-mid)', borderRadius:10, padding:'10px 12px', marginBottom:16 }}>
+              <Icon.Info size={13} style={{ color:'var(--purple)', marginTop:1, flexShrink:0 }}/>
+              <span style={{ fontSize:11.5, color:'var(--text-secondary)', lineHeight:1.5 }}>
+                This sends a real push notification to every reviewer who has enabled notifications — it reaches their device even if ReviewKE isn't open. Use it to announce new review jobs.
+              </span>
+            </div>
+            <div style={{ display:'grid', gap:12, marginBottom:16 }}>
+              <div>
+                <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:6 }}>Title</label>
+                <input value={notifTitle} onChange={e=>setNotifTitle(e.target.value)} placeholder="New review job available!" maxLength={60}/>
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:6 }}>Message</label>
+                <input value={notifBody} onChange={e=>setNotifBody(e.target.value)} placeholder="A new business just opened for review — tap to earn." maxLength={140}/>
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:6 }}>Link <span style={{ fontWeight:400, textTransform:'none' }}>(opens when tapped)</span></label>
+                <input value={notifUrl} onChange={e=>setNotifUrl(e.target.value)} placeholder="/businesses or /business/safaricom"/>
+              </div>
+            </div>
+            <button onClick={handleSendBroadcast} disabled={sending || !subscriberCount} style={{
+              display:'flex', alignItems:'center', gap:8, padding:'11px 20px',
+              background: (sending || !subscriberCount) ? '#eceef3' : 'var(--brand-gradient)',
+              color: (sending || !subscriberCount) ? 'var(--text-muted)' : '#fff',
+              border:'none', borderRadius:10, fontSize:13.5, fontWeight:700,
+              cursor: (sending || !subscriberCount) ? 'not-allowed' : 'pointer',
+              boxShadow: (sending || !subscriberCount) ? 'none' : 'var(--shadow-glow-purple)',
+            }}>
+              <Icon.Send size={14}/>
+              {sending ? 'Sending...' : subscriberCount === 0 ? 'No subscribers yet' : `Send to ${subscriberCount ?? '...'} subscriber${subscriberCount === 1 ? '' : 's'}`}
+            </button>
           </div>
         </div>
 
