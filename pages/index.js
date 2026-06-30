@@ -6,7 +6,7 @@ import AuthModal from '../components/AuthModal';
 import { useUser } from '../lib/useUser';
 import { useToast } from '../lib/useToast';
 import Icon from '../lib/icons';
-import { BUSINESSES } from '../data/businesses';
+import { BUSINESSES, logoUrl } from '../data/businesses';
 
 const FEATURED = BUSINESSES.filter(b => b.featured).slice(0, 4);
 
@@ -22,6 +22,39 @@ const STATS = [
   { val:'KES 2M+', lbl:'Paid out', icon:'TrendingUp' },
   { val:'16%', lbl:'Tax on withdrawal', icon:'Shield' },
 ];
+
+function FeaturedCard({ biz }) {
+  const [logoOk, setLogoOk] = useState(true);
+  const seed = biz.id.charCodeAt(0) + biz.id.charCodeAt(biz.id.length-1);
+  const reviewCount = 200 + (seed * 37) % 4600;
+  const displayRating = (2.8 + ((seed * 13) % 22) / 10).toFixed(1);
+
+  return (
+    <Link href={`/business/${biz.id}`} style={{ textDecoration:'none', color:'inherit' }}>
+      <div style={{ background:'#fff', borderRadius:16, border:'1px solid var(--border)', overflow:'hidden', boxShadow:'var(--shadow)', transition:'all .2s' }}
+        onMouseEnter={e=>{e.currentTarget.style.boxShadow='var(--shadow-lg)';e.currentTarget.style.transform='translateY(-2px)';}}
+        onMouseLeave={e=>{e.currentTarget.style.boxShadow='var(--shadow)';e.currentTarget.style.transform='translateY(0)';}}>
+        <div style={{ height:120, background:`linear-gradient(135deg,${biz.color}1a,${biz.color}06)`, display:'flex', alignItems:'center', justifyContent:'center', position:'relative', overflow:'hidden', padding:'16px' }}>
+          <div style={{ position:'absolute', inset:0, backgroundImage:`radial-gradient(${biz.color}18 1px,transparent 1px)`, backgroundSize:'18px 18px' }}/>
+          {logoOk ? (
+            <img src={logoUrl(biz,128)} alt={biz.name} onError={()=>setLogoOk(false)}
+              style={{ width:56, height:56, objectFit:'contain', position:'relative', zIndex:1, background:'#fff', borderRadius:12, padding:8, boxShadow:'var(--shadow)' }}/>
+          ) : (
+            <div style={{ width:56, height:56, borderRadius:14, background:`linear-gradient(135deg,${biz.color},${biz.color}80)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, fontWeight:900, color:'#fff', position:'relative', zIndex:1 }}>{biz.initial}</div>
+          )}
+        </div>
+        <div style={{ padding:'14px 16px' }}>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:6 }}>{biz.name}</div>
+          <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+            <Icon.Star size={12} filled style={{ color:'#F59E0B' }}/>
+            <span style={{ fontSize:12, fontWeight:700 }}>{displayRating}</span>
+            <span style={{ fontSize:11, color:'var(--text-muted)' }}>({reviewCount.toLocaleString()})</span>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
 
 export default function Home() {
   const { user, balance, login } = useUser();
@@ -121,37 +154,7 @@ export default function Home() {
             </Link>
           </div>
           <div className="feat-grid" style={{ display:'grid', gap:16 }}>
-            {FEATURED.map(biz => {
-              const seed = biz.id.charCodeAt(0) + biz.id.charCodeAt(biz.id.length-1);
-              const reviewCount = 200 + (seed * 37) % 4600;
-              const displayRating = (2.8 + ((seed * 13) % 22) / 10).toFixed(1);
-              const [logoOk, setLogoOk] = useState !== undefined ? [true, ()=>{}] : [true, ()=>{}];
-              return (
-                <Link key={biz.id} href={`/business/${biz.id}`} style={{ textDecoration:'none', color:'inherit' }}>
-                  <div style={{ background:'#fff', borderRadius:16, border:'1px solid var(--border)', overflow:'hidden', boxShadow:'var(--shadow)', transition:'all .2s' }}
-                    onMouseEnter={e=>{e.currentTarget.style.boxShadow='var(--shadow-lg)';e.currentTarget.style.transform='translateY(-2px)';}}
-                    onMouseLeave={e=>{e.currentTarget.style.boxShadow='var(--shadow)';e.currentTarget.style.transform='translateY(0)';}}>
-                    <div style={{ height:120, background:`linear-gradient(135deg,${biz.color}22,${biz.color}0a)`, display:'flex', alignItems:'center', justifyContent:'center', position:'relative', overflow:'hidden', padding:'16px' }}>
-                      <div style={{ position:'absolute', inset:0, backgroundImage:`radial-gradient(${biz.color}18 1px,transparent 1px)`, backgroundSize:'18px 18px' }}/>
-                      {biz.imageUrl ? (
-                        <img src={biz.imageUrl} alt={biz.name} style={{ maxWidth:'55%', maxHeight:64, objectFit:'contain', filter:'brightness(0)', opacity:.8, position:'relative', zIndex:1 }}
-                          onError={e=>e.target.style.display='none'}/>
-                      ) : (
-                        <div style={{ width:60, height:60, borderRadius:16, background:`linear-gradient(135deg,${biz.color},${biz.color}80)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:26, fontWeight:900, color:'#fff', position:'relative', zIndex:1 }}>{biz.initial}</div>
-                      )}
-                    </div>
-                    <div style={{ padding:'14px 16px' }}>
-                      <div style={{ fontSize:14, fontWeight:700, marginBottom:6 }}>{biz.name}</div>
-                      <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-                        <Icon.Star size={12} filled style={{ color:'#F59E0B' }}/>
-                        <span style={{ fontSize:12, fontWeight:700 }}>{displayRating}</span>
-                        <span style={{ fontSize:11, color:'var(--text-muted)' }}>({reviewCount.toLocaleString()})</span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
+            {FEATURED.map(biz => <FeaturedCard key={biz.id} biz={biz} />)}
           </div>
         </div>
 

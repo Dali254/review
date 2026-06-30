@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Navbar from '../components/Navbar';
 import AuthModal from '../components/AuthModal';
+import UpgradeModal from '../components/UpgradeModal';
 import { useUser, TAX_RATE_WITHDRAW } from '../lib/useUser';
 import { useToast } from '../lib/useToast';
 import Icon from '../lib/icons';
@@ -34,6 +35,7 @@ export default function Wallet() {
   const { toast, Toast } = useToast();
   const router = useRouter();
   const [authOpen, setAuthOpen]   = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [wdOpen, setWdOpen]       = useState(false);
   const [wdAmt, setWdAmt]         = useState('');
   const [wdPhone, setWdPhone]     = useState('');
@@ -65,12 +67,12 @@ export default function Wallet() {
     const amt = parseInt(wdAmt);
     const tax = Math.round(amt * TAX_RATE_WITHDRAW);
     const net = amt - tax;
-    const ref = `RKE-${Date.now()}`;
+    const ref = `RKE-WD-${Date.now()}`;
     setWdRef(ref);
     setWdStep('paying');
 
     try {
-      await fetch('/api/pay', {
+      const res = await fetch('/api/pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -80,14 +82,45 @@ export default function Wallet() {
           reference: ref,
         }),
       });
-    } catch {}
+      const data = await res.json();
 
-    // After 3s simulate STK response, then show 72hr pending
-    setTimeout(() => {
-      const result = withdraw(amt);
-      setWdResult(result);
-      setWdStep('pending_72');
-    }, 3000);
+      if (!data.success) {
+        setWdStep('failed');
+        return;
+      }
+      pollWithdrawStatus(ref, amt);
+    } catch {
+      setWdStep('failed');
+    }
+  }
+
+  async function pollWithdrawStatus(ref, amt, attempt = 0) {
+    const MAX_ATTEMPTS = 15;
+    if (attempt >= MAX_ATTEMPTS) {
+      setWdStep('failed');
+      toast('Tax payment timed out. Please try again.', 'error');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/pay-status?reference=${ref}`);
+      const data = await res.json();
+
+      if (data.status === 'SUCCESS') {
+        // Tax confirmed paid — only now do we deduct balance and queue the payout
+        const result = withdraw(amt);
+        setWdResult(result);
+        setWdStep('pending_72');
+        return;
+      }
+      if (data.status === 'FAILED' || data.status === 'CANCELLED') {
+        setWdStep('failed');
+        toast('M-Pesa tax payment was not completed.', 'error');
+        return;
+      }
+      setTimeout(() => pollWithdrawStatus(ref, amt, attempt + 1), 3000);
+    } catch {
+      setTimeout(() => pollWithdrawStatus(ref, amt, attempt + 1), 3000);
+    }
   }
 
   return (
@@ -156,11 +189,11 @@ export default function Wallet() {
                   </div>
                 )}
                 {user?.plan !== 'pro' && (
-                  <button onClick={() => { upgradePro(); toast('Upgraded to Pro! Unlimited reviews unlocked.', 'success'); }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: 'rgba(255,184,0,0.1)', border: '1px solid rgba(255,184,0,0.25)', color: '#FFB800', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  <button onClick={() => setUpgradeOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: '#fff7ed', border: '1.5px solid #fed7aa', color: '#D97706', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                     <Icon.Zap size={12} /> Upgrade
                   </button>
                 )}
-                {user?.plan === 'pro' && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(255,184,0,0.1)', border: '1px solid rgba(255,184,0,0.25)', color: '#FFB800', borderRadius: 20, padding: '4px 10px', fontSize: 11, fontWeight: 700 }}><Icon.Award size={12} /> Pro</span>}
+                {user?.plan === 'pro' && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#fff7ed', border: '1.5px solid #fed7aa', color: '#D97706', borderRadius: 20, padding: '4px 10px', fontSize: 11, fontWeight: 700 }}><Icon.Award size={12} /> Pro</span>}
               </div>
             </div>
 
@@ -318,10 +351,28 @@ export default function Wallet() {
               <div style={{ textAlign: 'center', padding: '24px 0' }}>
                 <div className="spinner" style={{ margin: '0 auto 22px' }} />
                 <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>M-Pesa STK Push sent</h3>
-                <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, lineHeight: 1.6 }}>
-                  Check your phone <strong style={{ color: '#fff' }}>+254 {wdPhone}</strong><br />
+                <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.6 }}>
+                  Check your phone <strong style={{ color: 'var(--text)' }}>+254 {wdPhone}</strong><br />
                   Enter your PIN to pay the tax and confirm withdrawal.
                 </p>
+              </div>
+            )}
+
+            {wdStep === 'failed' && (
+              <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                <div style={{ width: 64, height: 64, borderRadius: 18, background: '#fff5f5', border: '1.5px solid #fed7d7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                  <Icon.XCircle size={32} style={{ color: '#e53e3e' }} />
+                </div>
+                <h3 style={{ fontSize: 19, fontWeight: 800, color: '#e53e3e', marginBottom: 8 }}>Tax payment not completed</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 22, lineHeight: 1.6 }}>
+                  We didn't receive your M-Pesa confirmation. Your balance was not deducted and no withdrawal was queued.
+                </p>
+                <button onClick={() => setWdStep('confirm')} style={{ width: '100%', padding: 13, background: 'var(--pink)', color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 10 }}>
+                  Try again
+                </button>
+                <button onClick={() => setWdOpen(false)} style={{ width: '100%', padding: 11, background: 'transparent', border: '1.5px solid var(--border)', borderRadius: 10, fontSize: 14, color: 'var(--text-muted)', cursor: 'pointer' }}>
+                  Close
+                </button>
               </div>
             )}
 
@@ -366,6 +417,7 @@ export default function Wallet() {
         </div>
       )}
 
+      {upgradeOpen && <UpgradeModal user={user} onClose={() => setUpgradeOpen(false)} onSuccess={() => { upgradePro(); setUpgradeOpen(false); toast('Pro plan activated!', 'success'); }} />}
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} onAuth={u => { login(u); toast(`Welcome back!`, 'success'); }} />}
       <Toast />
     </>

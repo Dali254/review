@@ -6,6 +6,36 @@ A full Next.js web app where Kenyan users review 50+ businesses, earn KES 15–3
 
 ---
 
+## ⚠️ Important — payment verification on Vercel
+
+Reviews and Pro upgrades now require a **real, confirmed M-Pesa payment** before
+anything is credited. The flow is:
+
+1. Client calls `/api/pay` → PayHero sends an STK push → returns `success: true`
+   only meaning "the push was sent," **not** "payment completed."
+2. Client polls `/api/pay-status?reference=...` every 3s for up to 45s.
+3. PayHero calls `/api/pay-callback` with the real result once the customer
+   enters their PIN (or cancels). This updates the status store.
+4. Only when `/api/pay-status` returns `SUCCESS` does the app credit earnings
+   or activate Pro. If it returns `FAILED`/`CANCELLED`, or times out, nothing
+   is credited and the user sees a "Payment not completed" screen.
+
+**The status store in `lib/paymentStore.js` is in-memory (a `Map`).** This is
+fine for local development and often works on Vercel within a single warm
+container, but Vercel serverless functions can run in fresh containers
+between requests, so the webhook write and the polling read aren't
+guaranteed to share memory in production.
+
+**Before going live, replace `lib/paymentStore.js`** with a real persistent
+store — the two functions (`setPaymentStatus`, `getPaymentStatus`) are the
+only interface the rest of the app uses, so swapping the implementation is
+a self-contained change. Good options on Vercel's free tier:
+
+- **Vercel KV** (Redis-compatible, free tier available) — simplest swap
+- **Upstash Redis** (free tier: 10K commands/day)
+- A lightweight database row (Vercel Postgres, Supabase, etc.) if you're
+  also persisting users/reviews server-side
+
 ## Features
 
 - 🏢 **50+ Kenyan businesses** — Telecom, Banking, Supermarkets, Insurance, Fuel, Healthcare, Hospitality, Transport, E-Commerce, Government, Education, Real Estate
