@@ -32,15 +32,12 @@ function StarPicker({ value, onChange, size = 26 }) {
 }
 
 function ReviewCard({ r }) {
-  const colors = ['#00C853','#CE1126','#1D4ED8','#7C3AED','#D97706','#0891B2'];
+  const colors = ['var(--green)','#CE1126','#1D4ED8','#7C3AED','#D97706','#0891B2'];
   const c = colors[r.id % colors.length];
   const init = r.name.split(' ').map(x => x[0]).join('').slice(0,2).toUpperCase();
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.04)',
-      backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-      border: '1px solid rgba(255,255,255,0.07)',
-      borderRadius: 14, padding: '18px',
+      background: '#fff', border: '1px solid var(--border)', borderRadius: 14, padding: '18px',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
@@ -49,21 +46,21 @@ function ReviewCard({ r }) {
             <div style={{ fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 }}>
               {[1,2,3,4,5].map(i => <Icon.Star key={i} size={10} filled={i <= r.rating} style={{ color: i <= r.rating ? '#FFB800' : 'rgba(255,255,255,0.15)' }} />)}
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{r.date}</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.date}</span>
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(0,200,83,0.1)', border: '1px solid rgba(0,200,83,0.2)', borderRadius: 20, padding: '3px 10px', fontSize: 11, fontWeight: 700, color: '#00C853', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(0,200,83,0.1)', border: '1px solid rgba(0,200,83,0.2)', borderRadius: 20, padding: '3px 10px', fontSize: 11, fontWeight: 700, color: 'var(--green)', flexShrink: 0 }}>
           <Icon.TrendingUp size={10} />+KES {r.earned}
         </div>
       </div>
       {r.text ? (
-        <p style={{ fontSize: 14, lineHeight: 1.6, color: 'rgba(255,255,255,0.6)', margin: 0 }}>{r.text}</p>
+        <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text-secondary)', margin: 0 }}>{r.text}</p>
       ) : (
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)', margin: 0, fontStyle: 'italic' }}>No written review</p>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0, fontStyle: 'italic' }}>No written review</p>
       )}
       <div style={{ marginTop: 12 }}>
-        <button style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 6, padding: '5px 11px', cursor: 'pointer' }}>
+        <button style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-muted)', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 11px', cursor: 'pointer' }}>
           <Icon.ThumbsUp size={11} /> Helpful ({r.helpful})
         </button>
       </div>
@@ -95,36 +92,36 @@ function generateReviews(bizId) {
 /* ── Daily limit upgrade modal ── */
 function LimitModal({ onClose, onUpgrade }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+    <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
       onClick={onClose}>
-      <div style={{ background: 'rgba(13,18,32,0.98)', backdropFilter: 'blur(40px)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '20px 20px 0 0', padding: '12px 24px env(safe-area-inset-bottom,32px)', width: '100%', maxWidth: 480, animation: 'slideUp 0.3s ease' }}
+      <div style={{ background: '#fff', border: '1px solid var(--border)', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: '12px 24px env(safe-area-inset-bottom,32px)', width: '100%', maxWidth: 480, animation: 'slideUp 0.3s ease' }}
         onClick={e => e.stopPropagation()}>
-        <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2, margin: '0 auto 20px' }} />
+        <div style={{ width: 36, height: 4, background: 'var(--border-strong)', borderRadius: 2, margin: '0 auto 20px' }} />
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div style={{ width: 60, height: 60, borderRadius: 18, background: 'rgba(255,184,0,0.12)', border: '1px solid rgba(255,184,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+          <div style={{ width: 60, height: 60, borderRadius: 18, background: '#fff7ed', border: '1.5px solid #fed7aa', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
             <Icon.Zap size={28} style={{ color: '#FFB800' }} />
           </div>
           <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Daily limit reached</h3>
-          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6, maxWidth: 320, margin: '0 auto' }}>
+          <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6, maxWidth: 320, margin: '0 auto' }}>
             You've used all 20 free reviews for today. Upgrade to Pro for unlimited daily reviews and priority payouts.
           </p>
         </div>
 
         {/* Plan comparison */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
-          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '16px 14px' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Free</div>
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 14px' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Free</div>
             {['20 reviews/day','KES 15–35 each','Standard payout'].map(f => (
-              <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 7 }}>
-                <Icon.Check size={13} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />{f}
+              <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: 'var(--text-secondary)', marginBottom: 7 }}>
+                <Icon.Check size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />{f}
               </div>
             ))}
           </div>
-          <div style={{ background: 'rgba(255,184,0,0.07)', border: '1px solid rgba(255,184,0,0.25)', borderRadius: 12, padding: '16px 14px', position: 'relative' }}>
+          <div style={{ background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: 12, padding: '16px 14px', position: 'relative' }}>
             <div style={{ position: 'absolute', top: -10, right: 10, background: '#FFB800', color: '#000', fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 20 }}>POPULAR</div>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#FFB800', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Pro · KES 299/mo</div>
             {['Unlimited reviews/day','KES 15–35 each','Faster payouts','Priority support'].map(f => (
-              <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: 'rgba(255,255,255,0.75)', marginBottom: 7 }}>
+              <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: 'var(--text)', marginBottom: 7 }}>
                 <Icon.Check size={13} style={{ color: '#FFB800', flexShrink: 0 }} />{f}
               </div>
             ))}
@@ -134,7 +131,7 @@ function LimitModal({ onClose, onUpgrade }) {
         <button onClick={onUpgrade} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg,#FFB800,#FF8800)', color: '#000', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 10 }}>
           <Icon.Zap size={16} /> Upgrade to Pro — KES 299/mo
         </button>
-        <button onClick={onClose} style={{ width: '100%', padding: '11px', background: 'transparent', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, fontSize: 14, color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}>
+        <button onClick={onClose} style={{ width: '100%', padding: '11px', background: 'transparent', border: '1px solid var(--border)', borderRadius: 10, fontSize: 14, color: 'var(--text-secondary)', cursor: 'pointer' }}>
           Maybe later — reset at midnight
         </button>
       </div>
@@ -232,13 +229,13 @@ export default function BusinessPage() {
     if (submitted) return (
       <div style={{ padding: '24px', textAlign: 'center' }}>
         <div style={{ width: 52, height: 52, borderRadius: 16, background: 'rgba(0,200,83,0.12)', border: '1px solid rgba(0,200,83,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
-          <Icon.CheckCircle size={26} style={{ color: '#00C853' }} />
+          <Icon.CheckCircle size={26} style={{ color: 'var(--green)' }} />
         </div>
-        <div style={{ fontSize: 16, fontWeight: 800, color: '#00C853', marginBottom: 6 }}>Review submitted!</div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 18, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--green)', marginBottom: 6 }}>Review submitted!</div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 18, lineHeight: 1.5 }}>
           Your earnings have been added to your wallet. Tax is only deducted when you withdraw.
         </div>
-        <button onClick={() => setSubmitted(false)} style={{ fontSize: 13, fontWeight: 600, color: '#00C853', background: 'rgba(0,200,83,0.1)', border: '1px solid rgba(0,200,83,0.2)', borderRadius: 8, padding: '8px 18px', cursor: 'pointer' }}>
+        <button onClick={() => setSubmitted(false)} style={{ fontSize: 13, fontWeight: 600, color: 'var(--green)', background: 'rgba(0,200,83,0.1)', border: '1px solid rgba(0,200,83,0.2)', borderRadius: 8, padding: '8px 18px', cursor: 'pointer' }}>
           Write another review
         </button>
       </div>
@@ -254,9 +251,9 @@ export default function BusinessPage() {
           <div style={{
             display: 'flex', alignItems: 'center', gap: 5,
             padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-            background: remaining <= 5 ? 'rgba(255,184,0,0.1)' : 'rgba(0,200,83,0.08)',
-            border: `1px solid ${remaining <= 5 ? 'rgba(255,184,0,0.25)' : 'rgba(0,200,83,0.18)'}`,
-            color: remaining <= 5 ? '#FFB800' : '#00C853',
+            background: remaining <= 5 ? 'rgba(255,184,0,0.1)' : 'var(--pink-light)',
+            border: `1px solid ${remaining <= 5 ? 'rgba(255,184,0,0.25)' : 'var(--pink-mid)'}`,
+            color: remaining <= 5 ? '#FFB800' : 'var(--green)',
           }}>
             <Icon.Zap size={10} />
             {user?.plan === 'pro' ? 'Unlimited' : `${remaining} left today`}
@@ -270,12 +267,12 @@ export default function BusinessPage() {
         </div>
 
         {rating > 0 && (
-          <div style={{ background: 'rgba(0,200,83,0.08)', border: '1px solid rgba(0,200,83,0.18)', borderRadius: 10, padding: '12px 14px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '12px 14px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#00C853', textTransform: 'uppercase', letterSpacing: '0.5px' }}>You earn</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>credited instantly · no text required</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>You earn</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>credited instantly · no text required</div>
             </div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: '#00C853' }}>KES {earn}</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--green)' }}>KES {earn}</div>
           </div>
         )}
 
@@ -290,19 +287,19 @@ export default function BusinessPage() {
                 resize: 'none',
                 fontSize: 16,
                 background: '#1a2236',
-                color: '#f1f5f9',
+                color: 'var(--text)',
                 WebkitTextFillColor: '#f1f5f9',
                 minHeight: 100,
               }}
             />
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', textAlign: 'right', marginTop: 4 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'right', marginTop: 4 }}>
             {reviewText.length > 0 ? `${reviewText.length} characters` : 'Optional'}
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 16, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 12px' }}>
-          <Icon.Info size={13} style={{ color: 'rgba(255,255,255,0.25)', marginTop: 1, flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 16, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
+          <Icon.Info size={13} style={{ color: 'var(--text-muted)', marginTop: 1, flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
             No fee to publish. A 16% tax is deducted only when you withdraw to M-Pesa.
           </span>
         </div>
@@ -345,12 +342,12 @@ export default function BusinessPage() {
       `}</style>
 
       <main style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 16px 100px' }}>
-        <button onClick={() => router.back()} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', marginBottom: 20 }}>
+        <button onClick={() => router.back()} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', marginBottom: 20 }}>
           <Icon.ArrowLeft size={14} /> Back
         </button>
 
         {/* Business header */}
-        <div style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, overflow: 'hidden', marginBottom: 24 }}>
+        <div style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: 20, overflow: 'hidden', marginBottom: 24 }}>
           <div style={{ height: 'clamp(120px,20vw,200px)', position: 'relative', overflow: 'hidden' }}>
             {photo ? (
               <img src={photo} alt={biz.name} onLoad={() => setImgLoaded(true)}
@@ -366,15 +363,15 @@ export default function BusinessPage() {
               <div style={{ flex: 1, minWidth: 0, paddingBottom: 4 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
                   <h1 style={{ fontSize: 'clamp(17px,3vw,24px)', fontWeight: 800, margin: 0 }}>{biz.name}</h1>
-                  {biz.verified && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(0,200,83,0.1)', border: '1px solid rgba(0,200,83,0.2)', color: '#00C853', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, flexShrink: 0 }}><Icon.Check size={10} /> Verified</span>}
+                  {biz.verified && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(0,200,83,0.1)', border: '1px solid rgba(0,200,83,0.2)', color: 'var(--green)', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, flexShrink: 0 }}><Icon.Check size={10} /> Verified</span>}
                 </div>
-                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: '0 0 8px' }}>{biz.description}</p>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 8px' }}>{biz.description}</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', gap: 2 }}>
                     {[1,2,3,4,5].map(i => <Icon.Star key={i} size={13} filled={i <= Math.round(displayRating)} style={{ color: i <= Math.round(displayRating) ? '#FFB800' : 'rgba(255,255,255,0.15)' }} />)}
                   </div>
                   <strong style={{ fontSize: 14, color: '#FFB800' }}>{displayRating}</strong>
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>({reviewCount.toLocaleString()})</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>({reviewCount.toLocaleString()})</span>
                   <span style={{ background: `${biz.color}20`, color: biz.color, border: `1px solid ${biz.color}35`, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20 }}>{biz.category}</span>
                 </div>
               </div>
@@ -392,12 +389,12 @@ export default function BusinessPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
               <Icon.Sparkles size={14} style={{ color: '#a78bfa' }} />
               <span style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '1px' }}>AI Analysis</span>
-              <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: aiInsights.score > 70 ? '#00C853' : '#FFB800', background: 'rgba(255,255,255,0.06)', padding: '2px 9px', borderRadius: 20 }}>{aiInsights.score}/100</span>
+              <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: aiInsights.score > 70 ? 'var(--green)' : '#FFB800', background: 'rgba(255,255,255,0.06)', padding: '2px 9px', borderRadius: 20 }}>{aiInsights.score}/100</span>
             </div>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6, marginBottom: 16 }}>{aiInsights.summary}</p>
+            <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>{aiInsights.summary}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12 }}>
               <div style={{ background: 'rgba(0,200,83,0.06)', border: '1px solid rgba(0,200,83,0.12)', borderRadius: 10, padding: 14 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#00C853', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}><Icon.CheckCircle size={11} /> What customers love</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--green)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}><Icon.CheckCircle size={11} /> What customers love</div>
                 {(aiInsights.highlights||[]).map((h,i) => <div key={i} style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', padding: '3px 0' }}>— {h}</div>)}
               </div>
               <div style={{ background: 'rgba(255,59,59,0.06)', border: '1px solid rgba(255,59,59,0.12)', borderRadius: 10, padding: 14 }}>
@@ -424,7 +421,7 @@ export default function BusinessPage() {
 
           {/* Desktop sidebar */}
           <div className="sidebar-panel" style={{ position: 'sticky', top: 72, height: 'fit-content' }}>
-            <div style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 18, boxShadow: '0 20px 40px rgba(0,0,0,0.25)' }}>
+            <div style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: '1px solid var(--border)', borderRadius: 18, boxShadow: '0 20px 40px rgba(0,0,0,0.25)' }}>
               <WritePanel />
             </div>
           </div>
@@ -433,15 +430,15 @@ export default function BusinessPage() {
 
       {/* Mobile write bottom sheet */}
       {showWritePanel && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end' }}
           onClick={() => setShowWritePanel(false)}>
-          <div style={{ background: 'rgba(13,18,32,0.98)', backdropFilter: 'blur(40px)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '20px 20px 0 0', padding: '0 0 env(safe-area-inset-bottom,20px)', width: '100%', maxHeight: '92vh', overflowY: 'auto', animation: 'slideUp 0.3s ease' }}
+          <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: '20px 20px 0 0', padding: '0 0 env(safe-area-inset-bottom,20px)', width: '100%', maxHeight: '92vh', overflowY: 'auto', animation: 'slideUp 0.3s ease' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ padding: '12px 20px 0' }}>
               <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2, margin: '0 auto 16px' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <span style={{ fontSize: 16, fontWeight: 700 }}>Write a review — {biz.name}</span>
-                <button onClick={() => setShowWritePanel(false)} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 8, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.5)' }}>
+                <button onClick={() => setShowWritePanel(false)} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 8, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}>
                   <Icon.X size={14} />
                 </button>
               </div>
@@ -458,4 +455,4 @@ export default function BusinessPage() {
   );
 }
 
-const lbl = { display: 'block', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 };
+const lbl = { display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 };
