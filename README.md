@@ -48,15 +48,63 @@ a self-contained change. Good options on Vercel's free tier:
 
 ---
 
-## Earning structure
+## Editing earning rates, fees, and limits
 
-| Stars | You earn | Platform fee (10%) |
-|-------|----------|---------------------|
-| ⭐    | KES 15   | KES 1.50            |
-| ⭐⭐   | KES 20   | KES 2               |
-| ⭐⭐⭐  | KES 25   | KES 2.50            |
-| ⭐⭐⭐⭐ | KES 30   | KES 3               |
-| ⭐⭐⭐⭐⭐| KES 35   | KES 3.50            |
+Every money-related number in the app lives in **one file**: `lib/config.js`.
+Edit it and every page — homepage, business detail, wallet, admin dashboard —
+picks up the change automatically.
+
+```js
+// lib/config.js
+export const EARN_RATES = { 1: 15, 2: 20, 3: 25, 4: 30, 5: 35 }; // KES per review, by star rating
+export const PUBLISH_FEE_KES = 1;        // KES charged via M-Pesa to verify + publish a review (0 = free)
+export const WITHDRAWAL_TAX_RATE = 0.16; // 16% deducted only when withdrawing to M-Pesa
+export const DAILY_FREE_LIMIT = 20;      // free-plan reviews per day before Pro is required
+export const PRO_PRICE_KES = 299;        // monthly Pro subscription price
+export const MIN_WITHDRAWAL_KES = 100;   // smallest withdrawal allowed
+```
+
+Current defaults:
+
+| Stars | Reviewer earns | Withdrawal tax (16%) | Net to M-Pesa |
+|-------|-----------------|------------------------|----------------|
+| ★ | KES 15 | KES 2.40 | KES 12.60 |
+| ★★ | KES 20 | KES 3.20 | KES 16.80 |
+| ★★★ | KES 25 | KES 4.00 | KES 21.00 |
+| ★★★★ | KES 30 | KES 4.80 | KES 25.20 |
+| ★★★★★ | KES 35 | KES 5.60 | KES 29.40 |
+
+A separate small **publish fee** (default KES 1, set `PUBLISH_FEE_KES = 0` to
+disable) is charged via M-Pesa STK push before a review is published — this
+is a verification step to deter fake/spam reviews, not the main revenue
+mechanism. Most platform revenue comes from the 16% withdrawal tax and Pro
+subscriptions.
+
+After editing `lib/config.js`, redeploy (or just `git push` if connected to
+Vercel) for the change to go live — no other files need to change.
+
+---
+
+## Admin dashboard
+
+Visit `/admin` on your deployed app (e.g. `https://your-app.vercel.app/admin`)
+to see a dashboard of every fee collected: publish fees, withdrawal tax, and
+Pro subscriptions, broken down by type, with a searchable transaction log.
+
+It's protected by a simple password gate (default password:
+`reviewke-admin`, set in `pages/admin.js` — **change this before deploying**).
+This is a basic device-level gate, not real authentication; don't rely on it
+to protect sensitive data.
+
+**Important limitation:** the dashboard currently reads from a
+browser-local ledger (`lib/feeLedger.js`), so it only shows fees collected
+in the same browser that's viewing `/admin` — not platform-wide across every
+user's device. This works for local testing and demos. For a real
+multi-user dashboard, every fee event needs to be written to a shared
+backend (a database table, or the same persistent store recommended for
+`lib/paymentStore.js`) instead of `localStorage`. The `recordFee()` /
+`getFees()` functions in `lib/feeLedger.js` are the only interface the rest
+of the app uses, so swapping the storage backend is a contained change.
 
 ---
 

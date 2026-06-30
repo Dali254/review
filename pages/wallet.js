@@ -8,6 +8,7 @@ import UpgradeModal from '../components/UpgradeModal';
 import { useUser, TAX_RATE_WITHDRAW } from '../lib/useUser';
 import { useToast } from '../lib/useToast';
 import Icon from '../lib/icons';
+import { recordFee, FEE_TYPES } from '../lib/feeLedger';
 
 const TX_STYLES = {
   earn:     { iconBg: 'rgba(0,200,83,0.1)',    iconColor: '#00C853',  amountColor: '#00C853',  IconName: 'TrendingUp',  sign: '+' },
@@ -108,6 +109,13 @@ export default function Wallet() {
       if (data.status === 'SUCCESS') {
         // Tax confirmed paid — only now do we deduct balance and queue the payout
         const result = withdraw(amt);
+        recordFee({
+          type: FEE_TYPES.WITHDRAWAL_TAX,
+          amount: result.tax,
+          userName: user?.name,
+          userPhone: user?.phone,
+          reference: ref,
+        });
         setWdResult(result);
         setWdStep('pending_72');
         return;

@@ -186,8 +186,9 @@ export function logoUrl(biz, size = 128) {
   return `/api/logo?domain=${encodeURIComponent(biz.website)}&size=${size}&initial=${encodeURIComponent(biz.initial)}&color=${encodeURIComponent(biz.color)}`;
 }
 
-export const EARN_RATES = { 1:15, 2:20, 3:25, 4:30, 5:35 };
-export const TAX_RATE = 0;
+// Earning rates and fees now live in lib/config.js — edit that file to
+// change how much reviewers earn or what fees are charged.
+export { EARN_RATES, WITHDRAWAL_TAX_RATE as TAX_RATE } from '../lib/config';
 
 export function getBizById(id) {
   return BUSINESSES.find(b => b.id === id);

@@ -8,6 +8,8 @@ import { useUser } from '../../lib/useUser';
 import { useToast } from '../../lib/useToast';
 import Icon from '../../lib/icons';
 import { getBizById, logoUrl, EARN_RATES } from '../../data/businesses';
+import { PUBLISH_FEE_KES } from '../../lib/config';
+import { recordFee, FEE_TYPES } from '../../lib/feeLedger';
 
 const RATING_CATEGORIES = {
   Telecom:      [['Network Coverage','Smartphone'],['Customer Service','User'],['Pricing','DollarSign'],['App Experience','Star']],
@@ -127,6 +129,13 @@ export default function BusinessPage() {
 
   function handleContinue() {
     if (!allRated) { toast('Please rate every category', 'error'); return; }
+    if (PUBLISH_FEE_KES <= 0) {
+      // Free to publish — credit immediately, no STK push needed
+      addEarning(earn, `Review: ${biz.name}`);
+      setReviews(prev => [{ id:Date.now(), name:user.name, rating:avgRating, text:reviewText, date:'Just now', earned:earn, helpful:0 }, ...prev]);
+      setStage('submitted');
+      return;
+    }
     // Open payment confirmation — written review optional, payment is required to publish
     setPayPhone((user.phone||'').replace(/^0/,''));
     setPayStep('confirm');
@@ -138,10 +147,11 @@ export default function BusinessPage() {
     if (!ok) { setPayStep(null); setUpgradeOpen(true); return; }
     setPayStep('pending');
 
+    const reference = `RKE-VERIFY-${Date.now()}`;
     try {
       const res = await fetch('/api/pay', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ phone:'0'+payPhone, amount:1, name:user.name, reference:`RKE-VERIFY-${Date.now()}` }),
+        body: JSON.stringify({ phone:'0'+payPhone, amount:PUBLISH_FEE_KES, name:user.name, reference }),
       });
       const data = await res.json();
 
@@ -172,6 +182,16 @@ export default function BusinessPage() {
 
       if (data.status === 'SUCCESS') {
         addEarning(earn, `Review: ${biz.name}`);
+        if (PUBLISH_FEE_KES > 0) {
+          recordFee({
+            type: FEE_TYPES.PUBLISH,
+            amount: PUBLISH_FEE_KES,
+            userName: user.name,
+            userPhone: user.phone,
+            businessName: biz.name,
+            reference,
+          });
+        }
         setReviews(prev => [{ id:Date.now(), name:user.name, rating:avgRating, text:reviewText, date:'Just now', earned:earn, helpful:0 }, ...prev]);
         setPayStep('success');
         return;
@@ -459,7 +479,7 @@ export default function BusinessPage() {
                   </div>
                   <h3 style={{ fontSize:19, fontWeight:800, marginBottom:8 }}>Verify your phone number</h3>
                   <p style={{ fontSize:13, color:'var(--text-secondary)', lineHeight:1.6, maxWidth:320, margin:'0 auto' }}>
-                    To prevent fake reviews, we confirm a small KES 1 charge via M-Pesa before publishing. You'll then earn <strong style={{ color:'var(--pink)' }}>KES {earn}.00</strong>.
+                    To prevent fake reviews, we confirm a small KES {PUBLISH_FEE_KES} charge via M-Pesa before publishing. You'll then earn <strong style={{ color:'var(--pink)' }}>KES {earn}.00</strong>.
                   </p>
                 </div>
                 <label style={{ display:'block', fontSize:12, fontWeight:600, color:'var(--text-secondary)', marginBottom:8 }}>M-Pesa number</label>
@@ -468,7 +488,7 @@ export default function BusinessPage() {
                   <input value={payPhone} onChange={e=>setPayPhone(e.target.value.replace(/\D/g,'').slice(0,9))} placeholder="712345678" type="tel" inputMode="numeric" style={{ border:'none', borderRadius:0, flex:1 }}/>
                 </div>
                 <button onClick={handlePay} style={{ width:'100%', padding:14, background:'var(--pink)', color:'#fff', border:'none', borderRadius:12, fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'0 4px 16px rgba(192,24,95,0.3)', marginBottom:10 }}>
-                  <Icon.Smartphone size={16}/>Pay KES 1 & Publish
+                  <Icon.Smartphone size={16}/>Pay KES {PUBLISH_FEE_KES} & Publish
                 </button>
                 <button onClick={() => setPayStep(null)} style={{ width:'100%', padding:11, background:'transparent', border:'1.5px solid var(--border)', borderRadius:12, fontSize:14, color:'var(--text-muted)', cursor:'pointer' }}>Cancel</button>
               </>

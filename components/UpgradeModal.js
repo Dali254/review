@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Icon from '../lib/icons';
 import { PRO_PRICE_KES } from '../lib/useUser';
+import { recordFee, FEE_TYPES } from '../lib/feeLedger';
 
 export default function UpgradeModal({ user, onClose, onSuccess }) {
   const [step, setStep] = useState('plans'); // plans | phone | paying | success | failed
@@ -38,7 +39,17 @@ export default function UpgradeModal({ user, onClose, onSuccess }) {
     try {
       const res = await fetch(`/api/pay-status?reference=${reference}`);
       const data = await res.json();
-      if (data.status === 'SUCCESS') { setStep('success'); return; }
+      if (data.status === 'SUCCESS') {
+        recordFee({
+          type: FEE_TYPES.PRO_SUBSCRIPTION,
+          amount: PRO_PRICE_KES,
+          userName: user?.name,
+          userPhone: user?.phone,
+          reference,
+        });
+        setStep('success');
+        return;
+      }
       if (data.status === 'FAILED' || data.status === 'CANCELLED') { setStep('failed'); return; }
       setTimeout(() => pollPaymentStatus(reference, attempt + 1), 3000);
     } catch {
