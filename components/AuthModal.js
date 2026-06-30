@@ -34,12 +34,20 @@ const REVIEW_PREFERENCES = [
 
 export default function AuthModal({ onClose, onAuth }) {
   const [tab, setTab]     = useState('signup');
-  const [step, setStep]   = useState('form'); // form | preference (signup only)
+  const [step, setStep]   = useState('form'); // form | preference | scanning (signup only)
   const [name, setName]   = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [preference, setPreference] = useState('local');
   const [error, setError] = useState('');
+  const [scanPhase, setScanPhase] = useState(0);
+
+  const SCAN_STEPS = [
+    'Connecting to global review network...',
+    'Scanning Google, Meta, Amazon, Apple...',
+    'Matching jobs to your profile...',
+    'Found international review jobs!',
+  ];
 
   function validateForm() {
     setError('');
@@ -65,13 +73,38 @@ export default function AuthModal({ onClose, onAuth }) {
   }
 
   function finishSignup() {
+    // International (or both) gets a brief "AI scanning for jobs" moment
+    // before landing — purely cosmetic, but it sets the right expectation
+    // that international jobs are a distinct, curated set.
+    if (preference === 'international' || preference === 'both') {
+      setStep('scanning');
+      setScanPhase(0);
+      let phase = 0;
+      const interval = setInterval(() => {
+        phase += 1;
+        setScanPhase(phase);
+        if (phase >= SCAN_STEPS.length - 1) {
+          clearInterval(interval);
+          setTimeout(() => {
+            onAuth({ name: name.trim(), phone: '0' + phone, email, reviewPreference: preference });
+            onClose();
+          }, 900);
+        }
+      }, 750);
+      return;
+    }
     onAuth({ name: name.trim(), phone: '0' + phone, email, reviewPreference: preference });
     onClose();
   }
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:500, background:'rgba(0,0,0,0.4)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={onClose}>
-      <div style={{ background:'#fff', borderRadius:20, padding:28, width:'100%', maxWidth:440, boxShadow:'0 24px 60px rgba(0,0,0,0.15)', animation:'fadeUp 0.3s ease' }} onClick={e=>e.stopPropagation()}>
+      <div className="auth-modal-card" style={{ background:'#fff', borderRadius:20, padding:28, width:'100%', maxWidth:440, boxShadow:'0 24px 60px rgba(0,0,0,0.15)', animation:'fadeUp 0.3s ease', maxHeight:'90vh', overflowY:'auto' }} onClick={e=>e.stopPropagation()}>
+        <style>{`
+          @media (max-width: 420px) {
+            .auth-modal-card { padding: 20px !important; border-radius: 16px !important; }
+          }
+        `}</style>
         <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}`}</style>
 
         {/* ── STEP: form (name/phone/email) ── */}
@@ -203,6 +236,62 @@ export default function AuthModal({ onClose, onAuth }) {
               Create account
             </button>
           </>
+        )}
+
+        {/* ── STEP: scanning (AI search animation for international/both) ── */}
+        {step === 'scanning' && (
+          <div style={{ textAlign:'center', padding:'28px 8px' }}>
+            <style>{`
+              @keyframes scan-pulse { 0%,100% { transform:scale(1); opacity:1; } 50% { transform:scale(1.08); opacity:.85; } }
+              @keyframes scan-ring { 0% { transform:scale(0.8); opacity:.6; } 100% { transform:scale(1.6); opacity:0; } }
+              @keyframes scan-dot-bounce { 0%,80%,100% { transform:scale(0.6); opacity:.4; } 40% { transform:scale(1); opacity:1; } }
+            `}</style>
+
+            <div style={{ position:'relative', width:88, height:88, margin:'0 auto 26px' }}>
+              <div style={{ position:'absolute', inset:0, borderRadius:'50%', border:'2px solid var(--purple)', animation:'scan-ring 1.6s ease-out infinite' }}/>
+              <div style={{ position:'absolute', inset:0, borderRadius:'50%', border:'2px solid var(--pink)', animation:'scan-ring 1.6s ease-out infinite .5s' }}/>
+              <div style={{
+                position:'relative', width:88, height:88, borderRadius:'50%',
+                background:'var(--brand-gradient)', display:'flex', alignItems:'center', justifyContent:'center',
+                boxShadow:'var(--shadow-glow-purple)', animation:'scan-pulse 1.4s ease-in-out infinite',
+              }}>
+                <Icon.Sparkles size={36} style={{ color:'#fff' }}/>
+              </div>
+            </div>
+
+            <h3 style={{ fontSize:18, fontWeight:800, color:'var(--text)', marginBottom:18 }}>
+              {scanPhase >= SCAN_STEPS.length - 1 ? 'Jobs found!' : 'AI is finding your jobs'}
+            </h3>
+
+            <div style={{ display:'flex', flexDirection:'column', gap:10, maxWidth:300, margin:'0 auto' }}>
+              {SCAN_STEPS.map((label, i) => {
+                const isDone = i < scanPhase;
+                const isActive = i === scanPhase;
+                const isPending = i > scanPhase;
+                if (isPending) return null;
+                return (
+                  <div key={i} style={{
+                    display:'flex', alignItems:'center', gap:10, textAlign:'left',
+                    padding:'9px 12px', borderRadius:10,
+                    background: isActive ? 'var(--purple-light)' : '#f0fdf4',
+                    opacity: isPending ? 0.3 : 1,
+                    transition:'all .3s ease',
+                  }}>
+                    {isDone ? (
+                      <Icon.CheckCircle size={15} style={{ color:'var(--green)', flexShrink:0 }}/>
+                    ) : (
+                      <div style={{ display:'flex', gap:3, flexShrink:0, width:15, justifyContent:'center' }}>
+                        {[0,1,2].map(d => (
+                          <span key={d} style={{ width:4, height:4, borderRadius:'50%', background:'var(--purple)', display:'inline-block', animation:`scan-dot-bounce 1.2s ease-in-out infinite ${d*0.15}s` }}/>
+                        ))}
+                      </div>
+                    )}
+                    <span style={{ fontSize:12.5, fontWeight: isActive ? 700 : 500, color: isDone ? 'var(--text)' : 'var(--text-secondary)' }}>{label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
       </div>
     </div>

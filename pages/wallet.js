@@ -164,7 +164,7 @@ export default function Wallet() {
                   A {TAX_PCT}% withholding tax is deducted when you withdraw. No charge to publish reviews.
                 </div>
                 <div className="wallet-hero-actions" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <button onClick={openWithdraw} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', background: '#fff', border: 'none', color: 'var(--pink)', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+                  <button onClick={openWithdraw} className="btn-on-color-exempt" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', background: '#fff', border: 'none', color: 'var(--pink)', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
                     <Icon.CreditCard size={14} /> Withdraw to M-Pesa
                   </button>
                   <button onClick={() => router.push('/businesses')} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', background: 'rgba(255,255,255,0.16)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>

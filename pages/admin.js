@@ -96,7 +96,7 @@ export default function AdminDashboard() {
       <>
         <Head><title>Admin — ReviewKE</title></Head>
         <Navbar user={user} onAuthClick={()=>{}} balance={balance}/>
-        <div style={{ maxWidth:400, margin:'80px auto', padding:'0 20px' }}>
+        <div style={{ maxWidth:400, margin:'48px auto', padding:'0 20px' }}>
           <div style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:20, padding:32, boxShadow:'var(--shadow-lg)', textAlign:'center' }}>
             <div style={{ width:56, height:56, borderRadius:16, background:'var(--pink-light)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 18px' }}>
               <Icon.Shield size={26} style={{ color:'var(--pink)' }}/>
@@ -200,7 +200,7 @@ export default function AdminDashboard() {
 
         {/* Current config — read-only display of lib/config.js values */}
         <div style={{ marginBottom:28 }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexWrap:'wrap', gap:8 }}>
             <h2 style={{ fontSize:15, fontWeight:700 }}>Current pricing config</h2>
             <span style={{ fontSize:11, color:'var(--text-muted)' }}>Edit in <code style={{ background:'#f1f5f9', padding:'2px 6px', borderRadius:4 }}>lib/config.js</code></span>
           </div>
@@ -236,7 +236,7 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <div style={{ overflowX:'auto' }}>
-                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+                <table style={{ width:'100%', minWidth:720, borderCollapse:'collapse', fontSize:13 }}>
                   <thead>
                     <tr style={{ background:'#f8f9fc', borderBottom:'1px solid var(--border)' }}>
                       {['Type','User','Phone','Business','Amount','Reference','Date'].map(h => (

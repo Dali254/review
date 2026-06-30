@@ -2,7 +2,7 @@
 
 **Rate Kenyan businesses and earn M-Pesa rewards.**
 
-A full Next.js web app where Kenyan users review 50+ businesses, earn KES 15–35 per review, and receive payment via M-Pesa (PayHero STK Push). A 10% platform fee is collected per review.
+A full Next.js web app where Kenyan users review 54 local businesses (or 26 famous international brands on the Pro plan) and earn KES per review, paid via M-Pesa (PayHero STK Push). Earning rates and fees are configurable in lib/config.js.
 
 ---
 
@@ -38,7 +38,7 @@ a self-contained change. Good options on Vercel's free tier:
 
 ## Features
 
-- 🏢 **50+ Kenyan businesses** — Telecom, Banking, Supermarkets, Insurance, Fuel, Healthcare, Hospitality, Transport, E-Commerce, Government, Education, Real Estate
+- 🏢 **80 real businesses** — 54 local Kenyan businesses (Safaricom, Equity Bank, KFC Kenya, Naivas...) across 13 categories, plus 26 famous international brands (Google, Amazon, Alibaba, Starbucks, Marriott...) reserved for Pro subscribers
 - 🖼️ **Google Maps photos** — Real business photos pulled via Google Places API
 - 🤖 **AI insights** — Claude AI analyzes reviews and generates sentiment insights
 - 💚 **M-Pesa payments** — STK Push via PayHero for fee collection
@@ -202,7 +202,7 @@ npm run dev
 reviewke/
 ├── pages/
 │   ├── index.js              # Homepage with hero + featured businesses
-│   ├── businesses.js         # Browse all 50+ businesses
+│   ├── businesses.js         # Browse local/international businesses with region toggle
 │   ├── wallet.js             # Earnings wallet + withdraw
 │   ├── business/[id].js      # Business detail + review writing
 │   └── api/
@@ -218,7 +218,7 @@ reviewke/
 │   ├── useUser.js            # Auth + wallet state (localStorage)
 │   └── useToast.js           # Toast notification hook
 ├── data/
-│   └── businesses.js         # 50+ businesses with Google Place IDs
+│   └── businesses.js         # 80 businesses (54 local + 26 international), earn multipliers, regions
 ├── styles/
 │   └── globals.css
 ├── vercel.json               # Vercel deployment config

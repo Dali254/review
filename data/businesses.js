@@ -1,5 +1,5 @@
-// 50 real Kenyan businesses
-// logoUrl: Google's favicon service — fetches the REAL logo from each company's actual domain, always works, no API key
+// 54 real Kenyan local businesses + 26 famous international businesses (Pro plan only)
+// logoUrl: real logo proxy (/api/logo) — fetches the REAL logo from each company's actual domain, always works, no API key
 // website: the real domain, used both for the logo fetch and as a trust signal
 
 import { EARN_RATES, WITHDRAWAL_TAX_RATE } from '../lib/config';
@@ -116,6 +116,24 @@ export const BUSINESSES = [
   { id:"serena-hotels", region:"local", name:"Serena Hotels", category:"Hospitality", website:"serenahotels.com",
     address:"Nairobi, Mombasa, Amboseli & Maasai Mara", description:"Luxury eco-tourism hotels across East Africa",
     verified:true, color:"#065F46", initial:"S" },
+  { id:"kfc-kenya", region:"local", name:"KFC Kenya", category:"Hospitality", website:"kfc.co.ke",
+    address:"Multiple branches across Nairobi, Mombasa, Kisumu", description:"World-famous fried chicken chain with 20+ Kenyan outlets",
+    verified:true, featured:true, color:"#E4002B", initial:"K" },
+  { id:"pizza-hut-kenya", region:"local", name:"Pizza Hut Kenya", category:"Hospitality", website:"pizzahut.co.ke",
+    address:"Multiple branches across Nairobi & Mombasa", description:"International pizza chain with delivery across major Kenyan cities",
+    verified:true, color:"#EE3124", initial:"P" },
+  { id:"subway-kenya", region:"local", name:"Subway Kenya", category:"Hospitality", website:"subway.com",
+    address:"Westlands, Sarit Centre, Two Rivers & more", description:"Build-your-own sandwich chain with branches in Nairobi malls",
+    verified:true, color:"#00543D", initial:"S" },
+  { id:"dominos-kenya", region:"local", name:"Domino's Pizza Kenya", category:"Hospitality", website:"dominos.co.ke",
+    address:"Multiple branches across Nairobi", description:"Fast pizza delivery chain operating across the capital",
+    verified:true, color:"#0078AE", initial:"D" },
+  { id:"hilton-nairobi", region:"local", name:"Hilton Nairobi", category:"Hospitality", website:"hilton.com",
+    address:"Mama Ngina Street, Nairobi CBD", description:"Iconic 5-star hotel in the heart of Nairobi since 1969",
+    verified:true, color:"#002F61", initial:"H" },
+  { id:"radisson-blu-nairobi", region:"local", name:"Radisson Blu Nairobi", category:"Hospitality", website:"radissonhotels.com",
+    address:"Upper Hill, Nairobi", description:"Upscale international hotel chain with Nairobi properties",
+    verified:true, color:"#003DA5", initial:"R" },
 
   // ── TRANSPORT ──
   { id:"kenya-airways", region:"local", name:"Kenya Airways", category:"Transport", website:"kenya-airways.com",
@@ -218,6 +236,54 @@ export const INTERNATIONAL_BUSINESSES = [
   { id:"uber-global", region:"international", name:"Uber (Global)", category:"Transport", website:"uber.com",
     address:"San Francisco, California, USA", description:"Worldwide ride-hailing and delivery platform",
     verified:true, color:"#000000", initial:"U", earnMultiplier:1.3 },
+
+  // ── INTERNATIONAL ONLINE STORES ──
+  { id:"alibaba", region:"international", name:"Alibaba", category:"E-Commerce", website:"alibaba.com",
+    address:"Hangzhou, China", description:"World's largest B2B and wholesale e-commerce marketplace",
+    verified:true, featured:true, color:"#FF6A00", initial:"A", earnMultiplier:1.5 },
+  { id:"aliexpress", region:"international", name:"AliExpress", category:"E-Commerce", website:"aliexpress.com",
+    address:"Hangzhou, China", description:"Global online retail platform owned by Alibaba Group",
+    verified:true, color:"#E62E04", initial:"A", earnMultiplier:1.4 },
+  { id:"ebay", region:"international", name:"eBay", category:"E-Commerce", website:"ebay.com",
+    address:"San Jose, California, USA", description:"Pioneer global online auction and shopping marketplace",
+    verified:true, color:"#E53238", initial:"E", earnMultiplier:1.4 },
+  { id:"shein", region:"international", name:"SHEIN", category:"E-Commerce", website:"shein.com",
+    address:"Singapore", description:"Fast-fashion e-commerce giant shipping worldwide",
+    verified:true, color:"#000000", initial:"S", earnMultiplier:1.3 },
+  { id:"walmart", region:"international", name:"Walmart", category:"E-Commerce", website:"walmart.com",
+    address:"Bentonville, Arkansas, USA", description:"World's largest retail corporation by revenue",
+    verified:true, color:"#0071CE", initial:"W", earnMultiplier:1.4 },
+
+  // ── INTERNATIONAL HOTELS ──
+  { id:"marriott", region:"international", name:"Marriott International", category:"Hospitality", website:"marriott.com",
+    address:"Bethesda, Maryland, USA", description:"World's largest hotel chain with 30+ brands globally",
+    verified:true, featured:true, color:"#A6192E", initial:"M", earnMultiplier:1.4 },
+  { id:"hilton-global", region:"international", name:"Hilton Hotels (Global)", category:"Hospitality", website:"hilton.com",
+    address:"McLean, Virginia, USA", description:"Global hospitality giant with properties in 100+ countries",
+    verified:true, color:"#002F61", initial:"H", earnMultiplier:1.4 },
+  { id:"hyatt", region:"international", name:"Hyatt Hotels", category:"Hospitality", website:"hyatt.com",
+    address:"Chicago, Illinois, USA", description:"Premium global hotel chain known for luxury resorts",
+    verified:true, color:"#9A1F2B", initial:"H", earnMultiplier:1.3 },
+  { id:"ihg-hotels", region:"international", name:"IHG Hotels (Holiday Inn)", category:"Hospitality", website:"ihg.com",
+    address:"Denham, United Kingdom", description:"Parent of Holiday Inn, Crowne Plaza and InterContinental",
+    verified:true, color:"#A6192E", initial:"I", earnMultiplier:1.3 },
+  { id:"booking-com", region:"international", name:"Booking.com", category:"Hospitality", website:"booking.com",
+    address:"Amsterdam, Netherlands", description:"World's leading online hotel and travel booking platform",
+    verified:true, color:"#003580", initial:"B", earnMultiplier:1.4 },
+
+  // ── INTERNATIONAL RESTAURANTS ──
+  { id:"starbucks", region:"international", name:"Starbucks", category:"Hospitality", website:"starbucks.com",
+    address:"Seattle, Washington, USA", description:"World's largest coffeehouse chain",
+    verified:true, featured:true, color:"#00704A", initial:"S", earnMultiplier:1.4 },
+  { id:"burger-king", region:"international", name:"Burger King", category:"Hospitality", website:"bk.com",
+    address:"Miami, Florida, USA", description:"Global fast food chain famous for flame-grilled burgers",
+    verified:true, color:"#D62300", initial:"B", earnMultiplier:1.3 },
+  { id:"dominos-global", region:"international", name:"Domino's Pizza (Global)", category:"Hospitality", website:"dominos.com",
+    address:"Ann Arbor, Michigan, USA", description:"World's largest pizza delivery company",
+    verified:true, color:"#0078AE", initial:"D", earnMultiplier:1.3 },
+  { id:"subway-global", region:"international", name:"Subway (Global)", category:"Hospitality", website:"subway.com",
+    address:"Milford, Connecticut, USA", description:"World's largest sandwich chain by store count",
+    verified:true, color:"#00543D", initial:"S", earnMultiplier:1.3 },
 ];
 
 export const CATEGORIES = [

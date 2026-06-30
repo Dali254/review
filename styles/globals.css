@@ -66,6 +66,12 @@ p, span, div, li, td, th, label {
   color: inherit;
 }
 .text-on-color, .text-on-color * { color: var(--text-on-color) !important; }
+/* Escape hatch: an element marked .btn-on-color-exempt keeps its own
+   inline color even inside a .text-on-color wrapper — used for buttons
+   that are intentionally white/colored pills sitting on a gradient hero
+   (e.g. a white "Withdraw" button with pink text on a purple/pink card). */
+.text-on-color .btn-on-color-exempt,
+.text-on-color .btn-on-color-exempt * { color: var(--pink) !important; }
 
 input, textarea {
   background: #fff;

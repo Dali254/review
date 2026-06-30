@@ -1,5 +1,5 @@
 import Head from 'next/head';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Navbar from '../../components/Navbar';
 import AuthModal from '../../components/AuthModal';
@@ -92,7 +92,7 @@ export default function BusinessPage() {
   const { id } = router.query;
   const biz = id ? getBizById(id) : null;
 
-  const { user, balance, login, addEarning, getRemainingTasks, consumeTask, upgradePro } = useUser();
+  const { user, balance, login, addEarning, getRemainingTasks, consumeTask, upgradePro, hasReviewed, markReviewed } = useUser();
   const { toast, Toast } = useToast();
   const { celebrate, Celebration } = useCelebration();
   const { format } = useCurrency();
@@ -108,7 +108,14 @@ export default function BusinessPage() {
   const [payStep, setPayStep]       = useState(null); // null | confirm | pending | success | share
   const [payPhone, setPayPhone]     = useState('');
   const [sharedCount, setSharedCount] = useState(0);
-  const [shareClicked, setShareClicked] = useState({}); // { [index]: true } once that tile's WhatsApp share opened
+  // Per-slot status: 'idle' | 'waiting' | 'done'. A slot only becomes
+  // 'done' after the user has actually left the tab (gone to WhatsApp)
+  // AND been away for a minimum dwell time AND returned — not on click
+  // alone. This stops the old behaviour where people tapped all 10 tiles
+  // and bounced straight back without sharing anything.
+  const [shareSlots, setShareSlots] = useState({});
+  const activeSlotRef = useRef(null);
+  const leftAtRef = useRef(null);
 
   const isPro = user?.plan === 'pro';
   const isGated = biz?.region === 'international' && !isPro;
@@ -164,6 +171,7 @@ export default function BusinessPage() {
 
   function startReview() {
     if (!user) { setAuthOpen(true); return; }
+    if (hasReviewed(biz.id)) { toast('You already reviewed this business', 'error'); return; }
     setStage('rating');
   }
 
@@ -172,10 +180,12 @@ export default function BusinessPage() {
   }
 
   function handleContinue() {
+    if (hasReviewed(biz.id)) { toast('You already reviewed this business', 'error'); return; }
     if (!allRated) { toast('Please rate every category', 'error'); return; }
     if (PUBLISH_FEE_KES <= 0) {
       // Free to publish — credit immediately, no STK push needed
       addEarning(earn, `Review: ${biz.name}`);
+      markReviewed(biz.id);
       celebrate(earn, `Your review for ${biz.name} is live`);
       setReviews(prev => [{ id:Date.now(), name:user.name, rating:avgRating, text:reviewText, date:'Just now', earned:earn, helpful:0 }, ...prev]);
       setStage('submitted');
@@ -196,29 +206,61 @@ export default function BusinessPage() {
   const reviewShareUrl = biz ? `${typeof window !== 'undefined' ? window.location.origin : ''}/business/${biz.id}` : '';
   const shareMessage = biz ? `I just reviewed ${biz.name} on ReviewKE! Check it out and earn KES for your own reviews: ${reviewShareUrl}` : '';
 
-  function openWhatsAppShare(slotIndex) {
-    if (shareClicked[slotIndex]) return; // already used this slot
-    const waUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
-    window.open(waUrl, '_blank', 'noopener,noreferrer');
-    setShareClicked(prev => ({ ...prev, [slotIndex]: true }));
-    setSharedCount(prev => {
-      const next = Math.min(prev + 1, SHARE_TARGET_COUNT);
-      if (next === SHARE_TARGET_COUNT) {
-        toast('All shares complete — you can publish for free!', 'success');
+  const MIN_AWAY_MS = 8000; // must be away from the tab for at least 8s — long enough to actually pick a chat and send, short enough not to be annoying
+
+  // Detect the user coming back to this tab after we sent them to WhatsApp.
+  // Only counts the share complete if they were away long enough.
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState !== 'visible') return; // only care about returning
+      const slot = activeSlotRef.current;
+      const leftAt = leftAtRef.current;
+      if (slot === null || leftAt === null) return;
+
+      const awayMs = Date.now() - leftAt;
+      activeSlotRef.current = null;
+      leftAtRef.current = null;
+
+      if (awayMs < MIN_AWAY_MS) {
+        // Came back too fast — almost certainly didn't actually share.
+        setShareSlots(prev => ({ ...prev, [slot]: 'idle' }));
+        toast("That was quick — make sure you actually send the message in WhatsApp before coming back.", 'error');
+        return;
       }
-      return next;
-    });
+
+      setShareSlots(prev => {
+        const updated = { ...prev, [slot]: 'done' };
+        const doneCount = Object.values(updated).filter(s => s === 'done').length;
+        setSharedCount(doneCount);
+        if (doneCount === SHARE_TARGET_COUNT) {
+          toast('All shares verified — you can publish for free!', 'success');
+        }
+        return updated;
+      });
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
+  function openWhatsAppShare(slotIndex) {
+    if (shareSlots[slotIndex] === 'done' || shareSlots[slotIndex] === 'waiting') return; // already used or in progress
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
+    activeSlotRef.current = slotIndex;
+    leftAtRef.current = Date.now();
+    setShareSlots(prev => ({ ...prev, [slotIndex]: 'waiting' }));
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
   }
 
   function handlePublishViaShare() {
     if (sharedCount < SHARE_TARGET_COUNT) return;
     addEarning(earn, `Review: ${biz.name}`);
+    markReviewed(biz.id);
     celebrate(earn, `Your review for ${biz.name} is live`);
     setReviews(prev => [{ id:Date.now(), name:user.name, rating:avgRating, text:reviewText, date:'Just now', earned:earn, helpful:0 }, ...prev]);
     setPayStep(null);
     setStage('submitted');
     setSharedCount(0);
-    setShareClicked({});
+    setShareSlots({});
   }
 
   async function handlePay() {
@@ -262,6 +304,7 @@ export default function BusinessPage() {
 
       if (data.status === 'SUCCESS') {
         addEarning(earn, `Review: ${biz.name}`);
+        markReviewed(biz.id);
         celebrate(earn, `Your review for ${biz.name} is live`);
         if (PUBLISH_FEE_KES > 0) {
           recordFee({
@@ -308,11 +351,27 @@ export default function BusinessPage() {
       <style>{`
         @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
         .biz-page-wrap { max-width:680px; margin:0 auto; padding:24px 20px 100px; }
-        @media(max-width:480px){ .biz-page-wrap{ padding:16px 14px 90px !important; } }
+        .rating-header-band { }
+        .rating-body-pad { }
+        .biz-detail-card-pad { padding: 28px 28px 32px; }
+        .biz-stats-grid { }
+        .share-tile-grid { grid-template-columns: repeat(5, 1fr); }
+        @media(max-width:480px){
+          .biz-page-wrap{ padding:16px 14px 90px !important; }
+          .rating-header-band { padding: 20px 18px 16px !important; }
+          .rating-body-pad { padding: 6px 18px 22px !important; }
+          .biz-detail-card-pad { padding: 20px 18px 24px !important; }
+        }
+        @media(max-width:360px){
+          .share-tile-grid { grid-template-columns: repeat(5, 1fr) !important; gap: 6px !important; }
+        }
+        @media(max-width:600px){
+          .top-bar-row { padding: 12px 14px !important; }
+        }
       `}</style>
 
       {/* Top bar */}
-      <div style={{ background:'#fff', borderBottom:'1px solid var(--border)', padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+      <div className="top-bar-row" style={{ background:'#fff', borderBottom:'1px solid var(--border)', padding:'14px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <button onClick={() => stage==='detail' ? router.back() : setStage('detail')} style={{ display:'flex', alignItems:'center', gap:10, background:'none', border:'none', cursor:'pointer' }}>
           <Icon.ArrowLeft size={18} style={{ color:'var(--text-secondary)' }}/>
           <div style={{ textAlign:'left' }}>
@@ -367,7 +426,7 @@ export default function BusinessPage() {
               )}
             </div>
 
-            <div style={{ padding:'28px 28px 32px' }}>
+            <div className="biz-detail-card-pad" style={{ padding:'28px 28px 32px' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6, gap:12 }}>
                 <h1 style={{ fontSize:24, fontWeight:800 }}>{biz.name} <span style={{ fontSize:14, fontWeight:500, color:'var(--text-muted)' }}>KE</span></h1>
                 <span style={{ background:'var(--pink-light)', color:'var(--pink)', fontSize:12, fontWeight:700, padding:'5px 12px', borderRadius:20, whiteSpace:'nowrap' }}>{biz.category}</span>
@@ -406,9 +465,26 @@ export default function BusinessPage() {
                 You'll rate {biz.name} on {categories.length} categories, then write an optional review. Submitting earns you up to {format(EARN_RATES[5])}.
               </p>
 
-              <button onClick={startReview} style={{ width:'100%', padding:16, background:'var(--brand-gradient)', color:'#fff', border:'none', borderRadius:14, fontSize:16, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'var(--shadow-glow-purple)', transition:'transform .15s' }}>
-                Start Review <Icon.ArrowRight size={17}/>
-              </button>
+              {hasReviewed(biz.id) ? (
+                <>
+                  <div style={{ display:'flex', alignItems:'center', gap:10, background:'#f0fdf4', border:'1.5px solid #bbf7d0', borderRadius:14, padding:'14px 16px', marginBottom:16 }}>
+                    <div style={{ width:36, height:36, borderRadius:10, background:'var(--green)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      <Icon.Check size={18} style={{ color:'#fff' }}/>
+                    </div>
+                    <div>
+                      <div style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>You already reviewed {biz.name}</div>
+                      <div style={{ fontSize:12, color:'var(--text-secondary)', marginTop:1 }}>Each business can only be reviewed once per account</div>
+                    </div>
+                  </div>
+                  <button disabled style={{ width:'100%', padding:16, background:'#eceef3', color:'var(--text-muted)', border:'none', borderRadius:14, fontSize:16, fontWeight:700, cursor:'not-allowed', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                    <Icon.Shield size={17}/> Review locked
+                  </button>
+                </>
+              ) : (
+                <button onClick={startReview} style={{ width:'100%', padding:16, background:'var(--brand-gradient)', color:'#fff', border:'none', borderRadius:14, fontSize:16, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'var(--shadow-glow-purple)', transition:'transform .15s' }}>
+                  Start Review <Icon.ArrowRight size={17}/>
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -417,7 +493,7 @@ export default function BusinessPage() {
         {stage === 'rating' && (
           <div className="fade-up" style={{ background:'#fff', borderRadius:24, border:'1px solid var(--border)', overflow:'hidden', boxShadow:'var(--shadow-lg)' }}>
             {/* Header band */}
-            <div style={{ padding:'26px 28px 22px', background:'var(--brand-gradient-soft)', borderBottom:'1px solid var(--border)' }}>
+            <div className="rating-header-band" style={{ padding:'26px 28px 22px', background:'var(--brand-gradient-soft)', borderBottom:'1px solid var(--border)' }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
                 <div>
                   <h2 style={{ fontSize:21, fontWeight:800, marginBottom:4 }}>Rate Your Experience</h2>
@@ -439,7 +515,7 @@ export default function BusinessPage() {
               </div>
             </div>
 
-            <div style={{ padding:'8px 28px 28px' }}>
+            <div className="rating-body-pad" style={{ padding:'8px 28px 28px' }}>
               {categories.map(([label, iconName], i) => {
                 const IC = Icon[iconName] || Icon.Star;
                 const rated = catRatings[label] > 0;
@@ -589,7 +665,7 @@ export default function BusinessPage() {
                   <Icon.Smartphone size={16}/>Pay {format(PUBLISH_FEE_KES)} & Publish
                 </button>
                 <button onClick={() => setPayStep('share')} style={{ width:'100%', padding:13, background:'#f0fdf4', border:'1.5px solid #bbf7d0', borderRadius:12, fontSize:14, fontWeight:700, color:'var(--green)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:10 }}>
-                  <Icon.Send size={15}/>Don't want to pay? Share to {SHARE_TARGET_COUNT} WhatsApp groups instead
+                  <Icon.WhatsApp size={16}/>Don't want to pay? Share to {SHARE_TARGET_COUNT} WhatsApp groups instead
                 </button>
                 <button onClick={() => setPayStep(null)} style={{ width:'100%', padding:11, background:'transparent', border:'1.5px solid var(--border)', borderRadius:12, fontSize:14, color:'var(--text-muted)', cursor:'pointer' }}>Cancel</button>
               </>
@@ -598,22 +674,23 @@ export default function BusinessPage() {
             {payStep === 'share' && (() => {
               const pct = Math.round((sharedCount / SHARE_TARGET_COUNT) * 100);
               const complete = sharedCount >= SHARE_TARGET_COUNT;
+              const waitingCount = Object.values(shareSlots).filter(s => s === 'waiting').length;
               return (
                 <>
                   <div style={{ textAlign:'center', marginBottom:20 }}>
                     <div style={{ width:60, height:60, borderRadius:16, background:'#f0fdf4', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px' }}>
-                      <Icon.Send size={26} style={{ color:'var(--green)' }}/>
+                      <Icon.WhatsApp size={30}/>
                     </div>
                     <h3 style={{ fontSize:19, fontWeight:800, marginBottom:8 }}>Share to unlock — free publish</h3>
                     <p style={{ fontSize:13, color:'var(--text-secondary)', lineHeight:1.6, maxWidth:340, margin:'0 auto' }}>
-                      Tap each tile below to share your review link to a WhatsApp group or contact. Once all {SHARE_TARGET_COUNT} are done, publish for free and earn <strong style={{ color:'var(--pink)' }}>{format(earn)}</strong>.
+                      Tap a tile to open WhatsApp, send your review link, then come back. Each share only counts after you've actually been in WhatsApp for a few seconds — quick taps won't count.
                     </p>
                   </div>
 
                   {/* Progress bar */}
                   <div style={{ marginBottom:18 }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                      <span style={{ fontSize:12, fontWeight:700, color:'var(--text-secondary)' }}>{sharedCount} of {SHARE_TARGET_COUNT} shared</span>
+                      <span style={{ fontSize:12, fontWeight:700, color:'var(--text-secondary)' }}>{sharedCount} of {SHARE_TARGET_COUNT} verified</span>
                       <span style={{ fontSize:13, fontWeight:800, color: complete ? 'var(--green)' : 'var(--purple)' }}>{pct}%</span>
                     </div>
                     <div style={{ height:10, background:'#f1f5f9', borderRadius:6, overflow:'hidden' }}>
@@ -625,35 +702,53 @@ export default function BusinessPage() {
                     </div>
                   </div>
 
-                  {/* 10-tile share grid */}
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:8, marginBottom:20 }}>
+                  {waitingCount > 0 && (
+                    <div style={{ display:'flex', alignItems:'center', gap:8, background:'#fff7ed', border:'1.5px solid #fed7aa', borderRadius:10, padding:'10px 13px', marginBottom:14 }}>
+                      <Icon.Clock size={14} style={{ color:'#D97706', flexShrink:0 }}/>
+                      <span style={{ fontSize:12, color:'#92400e', lineHeight:1.4 }}>
+                        Waiting for you to return from WhatsApp... send the message, then switch back to this tab.
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Share tile grid */}
+                  <div className="share-tile-grid" style={{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:8, marginBottom:20 }}>
                     {Array.from({ length: SHARE_TARGET_COUNT }, (_, i) => {
-                      const done = !!shareClicked[i];
+                      const status = shareSlots[i] || 'idle';
+                      const done = status === 'done';
+                      const waiting = status === 'waiting';
                       return (
                         <button
                           key={i}
                           onClick={() => openWhatsAppShare(i)}
-                          disabled={done}
-                          title={done ? `Group ${i+1} shared` : `Share to group ${i+1}`}
+                          disabled={done || waiting}
+                          title={done ? `Group ${i+1} verified` : waiting ? `Waiting on group ${i+1}...` : `Share to group ${i+1}`}
                           style={{
                             aspectRatio:'1', borderRadius:10, border:'none',
                             display:'flex', alignItems:'center', justifyContent:'center',
-                            background: done ? '#22c55e' : '#f0fdf4',
-                            cursor: done ? 'default' : 'pointer',
+                            background: done ? '#22c55e' : waiting ? '#fff7ed' : '#f0fdf4',
+                            cursor: (done || waiting) ? 'default' : 'pointer',
                             transition:'all .2s',
                             boxShadow: done ? '0 2px 8px rgba(34,197,94,0.3)' : 'none',
+                            position:'relative',
                           }}
                         >
-                          {done ? <Icon.Check size={18} style={{ color:'#fff' }}/> : <Icon.Send size={15} style={{ color:'var(--green)' }}/>}
+                          {done ? (
+                            <Icon.Check size={18} style={{ color:'#fff' }}/>
+                          ) : waiting ? (
+                            <Icon.Loader size={16} style={{ color:'#D97706' }}/>
+                          ) : (
+                            <Icon.WhatsApp size={20}/>
+                          )}
                         </button>
                       );
                     })}
                   </div>
 
                   <div style={{ display:'flex', alignItems:'flex-start', gap:7, background:'#f8f9fc', border:'1px solid var(--border)', borderRadius:10, padding:'10px 12px', marginBottom:18 }}>
-                    <Icon.Info size={13} style={{ color:'var(--text-muted)', marginTop:1, flexShrink:0 }}/>
+                    <Icon.Shield size={13} style={{ color:'var(--text-muted)', marginTop:1, flexShrink:0 }}/>
                     <span style={{ fontSize:11.5, color:'var(--text-muted)', lineHeight:1.5 }}>
-                      Each tile opens WhatsApp with your review link pre-filled. Pick a different group or contact each time — sharing the same chat repeatedly won't help spread real reviews.
+                      We verify you actually left for WhatsApp and stayed there a few seconds before counting a share. Pick a different group or contact each time.
                     </span>
                   </div>
 

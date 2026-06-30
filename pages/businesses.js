@@ -26,7 +26,7 @@ function timeAgo(seed) {
   return `Added ${hours} hr${hours>1?'s':''} ago`;
 }
 
-function BusinessCard({ biz, onWriteReview, isLocked }) {
+function BusinessCard({ biz, onWriteReview, lockReason }) {
   const [logoOk, setLogoOk] = useState(true);
   const [photoOk, setPhotoOk] = useState(true);
   const { format } = useCurrency();
@@ -35,6 +35,7 @@ function BusinessCard({ biz, onWriteReview, isLocked }) {
   const displayRating = (2.8 + ((seed*13)%22)/10).toFixed(1);
   const cardMinEarn = earnRateForBiz(biz, Object.keys(EARN_RATES).map(Number).reduce((a,b)=>Math.min(a,b)));
   const cardMaxEarn = earnRateForBiz(biz, 5);
+  const isLocked = !!lockReason;
 
   const catColors = {
     Banking:{bg:'#EFF6FF',fg:'#1D4ED8'}, Telecom:{bg:'#F0FDF4',fg:'#059669'},
@@ -52,7 +53,7 @@ function BusinessCard({ biz, onWriteReview, isLocked }) {
       onMouseEnter={e=>{ e.currentTarget.style.boxShadow='var(--shadow-lg)'; e.currentTarget.style.transform='translateY(-3px)'; }}
       onMouseLeave={e=>{ e.currentTarget.style.boxShadow='var(--shadow)'; e.currentTarget.style.transform='translateY(0)'; }}
     >
-      {isLocked && (
+      {lockReason === 'pro' && (
         <div onClick={() => onWriteReview(biz)} style={{ position:'absolute', inset:0, zIndex:5, background:'rgba(20,20,31,0.55)', backdropFilter:'blur(2px)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', cursor:'pointer', borderRadius:18, padding:20, textAlign:'center' }}>
           <div style={{ width:48, height:48, borderRadius:14, background:'var(--brand-gradient)', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:12, boxShadow:'var(--shadow-glow-purple)' }}>
             <Icon.Shield size={22} style={{ color:'#fff' }}/>
@@ -65,7 +66,13 @@ function BusinessCard({ biz, onWriteReview, isLocked }) {
         </div>
       )}
 
-      <Link href={`/business/${biz.id}`} style={{ display:'block', textDecoration:'none', pointerEvents: isLocked ? 'none' : 'auto' }}>
+      {lockReason === 'reviewed' && (
+        <div style={{ position:'absolute', top:12, right:12, zIndex:5, display:'flex', alignItems:'center', gap:5, background:'var(--green)', color:'#fff', fontSize:11, fontWeight:700, padding:'5px 11px', borderRadius:20, boxShadow:'0 2px 8px rgba(22,163,74,0.35)' }}>
+          <Icon.Check size={11}/>Reviewed
+        </div>
+      )}
+
+      <Link href={`/business/${biz.id}`} style={{ display:'block', textDecoration:'none', pointerEvents: lockReason === 'pro' ? 'none' : 'auto' }}>
         <div style={{ height:170, position:'relative', overflow:'hidden', background: photoOk ? '#f1f5f9' : `linear-gradient(135deg, ${biz.color}20 0%, ${biz.color}06 100%)` }}>
           {photoOk && (
             <img
@@ -112,7 +119,7 @@ function BusinessCard({ biz, onWriteReview, isLocked }) {
       </Link>
 
       <div style={{ padding:'16px 18px 18px', flex:1, display:'flex', flexDirection:'column', gap:10 }}>
-        <Link href={`/business/${biz.id}`} style={{ textDecoration:'none', pointerEvents: isLocked ? 'none' : 'auto' }}>
+        <Link href={`/business/${biz.id}`} style={{ textDecoration:'none', pointerEvents: lockReason === 'pro' ? 'none' : 'auto' }}>
           <div style={{ fontSize:16, fontWeight:800, color:'var(--text)', marginBottom:5 }}>{biz.name}</div>
           <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
             <Icon.MapPin size={12} style={{ color:'var(--pink)', flexShrink:0 }}/>
@@ -132,8 +139,25 @@ function BusinessCard({ biz, onWriteReview, isLocked }) {
           </div>
         </div>
 
-        <button onClick={() => onWriteReview(biz)} style={{ marginTop:'auto', width:'100%', padding:'12px', borderRadius:11, border:'none', background:'var(--brand-gradient)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'var(--shadow-glow-pink)', transition:'all .15s' }}>
-          <Icon.Send size={14}/>Write Review & Earn {format(cardMaxEarn)}
+        <button
+          onClick={() => lockReason !== 'reviewed' && onWriteReview(biz)}
+          disabled={lockReason === 'reviewed'}
+          style={{
+            marginTop:'auto', width:'100%', padding:'12px', borderRadius:11, border:'none',
+            background: lockReason === 'reviewed' ? '#eceef3' : 'var(--brand-gradient)',
+            color: lockReason === 'reviewed' ? 'var(--text-muted)' : '#fff',
+            fontSize:14, fontWeight:700,
+            cursor: lockReason === 'reviewed' ? 'not-allowed' : 'pointer',
+            display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+            boxShadow: lockReason === 'reviewed' ? 'none' : 'var(--shadow-glow-pink)',
+            transition:'all .15s',
+          }}
+        >
+          {lockReason === 'reviewed' ? (
+            <><Icon.Shield size={14}/>Already reviewed</>
+          ) : (
+            <><Icon.Send size={14}/>Write Review & Earn {format(cardMaxEarn)}</>
+          )}
         </button>
       </div>
     </div>
@@ -141,7 +165,7 @@ function BusinessCard({ biz, onWriteReview, isLocked }) {
 }
 
 export default function Businesses() {
-  const { user, balance, transactions, login, getRemainingTasks, DAILY_FREE_LIMIT, upgradePro, setReviewPreference } = useUser();
+  const { user, balance, transactions, login, getRemainingTasks, DAILY_FREE_LIMIT, upgradePro, setReviewPreference, hasReviewed } = useUser();
   const { toast, Toast } = useToast();
   const { format } = useCurrency();
   const [authOpen, setAuthOpen]     = useState(false);
@@ -176,6 +200,7 @@ export default function Businesses() {
 
   function handleWriteReview(biz) {
     if (!user) { setAuthOpen(true); return; }
+    if (hasReviewed(biz.id)) { toast('You already reviewed this business', 'error'); return; }
     if (biz.region === 'international' && !isPro) { setUpgradeOpen(true); return; }
     if (remaining <= 0 && !isPro) { setUpgradeOpen(true); return; }
     window.location.href = `/business/${biz.id}`;
@@ -202,6 +227,7 @@ export default function Businesses() {
         @media(max-width:640px) { .biz-grid { grid-template-columns:1fr !important; } .page-layout { padding:16px 16px 80px !important; } }
         @media(min-width:901px) and (max-width:1100px) { .biz-grid { grid-template-columns:repeat(2,1fr) !important; } }
         .mobile-cats { display:none !important; } @media(max-width:900px){ .mobile-cats{ display:flex !important; } }
+        .mobile-region-toggle { display:none !important; } @media(max-width:900px){ .mobile-region-toggle{ display:flex !important; } }
       `}</style>
 
       <div className="page-layout">
@@ -321,6 +347,31 @@ export default function Businesses() {
             </div>
           </div>
 
+          {/* Region toggle — visible on mobile/tablet where the sidebar is hidden */}
+          <div className="mobile-region-toggle" style={{ display:'none', gap:7, marginBottom:14, flexWrap:'wrap' }}>
+            {[
+              { id:'local', label:'Local', icon:'MapPin' },
+              { id:'international', label:'International', icon:'Globe', pro:true },
+              { id:'both', label:'Both', icon:'Grid' },
+            ].map(r => {
+              const RC = Icon[r.icon];
+              const active = regionView === r.id;
+              const locked = r.pro && !isPro;
+              return (
+                <button key={r.id} onClick={()=>changeRegionView(r.id)} style={{
+                  display:'flex', alignItems:'center', gap:6,
+                  padding:'8px 14px', borderRadius:20, fontSize:12, fontWeight:700,
+                  border: `1.5px solid ${active ? 'var(--purple-mid)' : 'var(--border)'}`,
+                  background: active ? 'var(--brand-gradient-soft)' : '#fff',
+                  color: active ? 'var(--purple)' : 'var(--text-secondary)',
+                  cursor:'pointer', whiteSpace:'nowrap',
+                }}>
+                  <RC size={13}/>{r.label}{locked && <Icon.Shield size={11} style={{ color:'#D97706' }}/>}
+                </button>
+              );
+            })}
+          </div>
+
           <div className="mobile-cats" style={{ gap:7, flexWrap:'wrap', marginBottom:20 }}>
             {['All',...Object.keys(catCounts)].map(cat => (
               <button key={cat} onClick={()=>setCategory(cat)} style={{ padding:'6px 14px', borderRadius:20, fontSize:12, fontWeight:600, border:'1.5px solid', borderColor: category===cat?'var(--pink)':'var(--border)', background: category===cat?'var(--pink-light)':'#fff', color: category===cat?'var(--pink)':'var(--text-secondary)', cursor:'pointer', whiteSpace:'nowrap' }}>
@@ -337,7 +388,10 @@ export default function Businesses() {
             </div>
           ) : (
             <div className="biz-grid">
-              {filtered.map(biz => <BusinessCard key={biz.id} biz={biz} onWriteReview={handleWriteReview} isLocked={biz.region === 'international' && !isPro}/>)}
+              {filtered.map(biz => {
+                const lockReason = hasReviewed(biz.id) ? 'reviewed' : (biz.region === 'international' && !isPro) ? 'pro' : null;
+                return <BusinessCard key={biz.id} biz={biz} onWriteReview={handleWriteReview} lockReason={lockReason}/>;
+              })}
             </div>
           )}
         </div>

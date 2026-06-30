@@ -42,14 +42,22 @@ export default function Navbar({ user, onAuthClick, balance = 0 }) {
         .nav-links { display:flex; gap:6px; align-items:center; }
         .mobile-nav { display:none !important; }
         .nav-currency-desktop { display:flex !important; }
+        .nav-portal-badge { display:inline; }
+        @media(max-width:820px){
+          .nav-portal-badge { display:none !important; }
+          nav.main-nav { padding:0 14px !important; }
+        }
         @media(max-width:640px){
           .nav-links { display:none !important; }
           .nav-currency-desktop { display:none !important; }
           .mobile-nav { display:flex !important; position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid #e8ecf0; z-index:200; padding-bottom:env(safe-area-inset-bottom,0); }
         }
+        @media(max-width:380px){
+          .nav-user-label { display:none !important; }
+        }
       `}</style>
 
-      <nav style={{ background:'#fff', borderBottom:'1px solid #e8ecf0', height:60, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 24px', position:'sticky', top:0, zIndex:100, boxShadow:'0 1px 4px rgba(0,0,0,0.04)' }}>
+      <nav className="main-nav" style={{ background:'#fff', borderBottom:'1px solid #e8ecf0', height:60, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 24px', position:'sticky', top:0, zIndex:100, boxShadow:'0 1px 4px rgba(0,0,0,0.04)' }}>
         {/* Logo */}
         <Link href="/" style={{ display:'flex', alignItems:'center', gap:10 }}>
           <div style={{ width:34, height:34, borderRadius:10, background:'var(--brand-gradient)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'var(--shadow-glow-purple)' }}>
@@ -61,7 +69,7 @@ export default function Navbar({ user, onAuthClick, balance = 0 }) {
               background:'var(--brand-gradient)',
               WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
             }}>ReviewKE</span>
-            <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:500, marginLeft:8, background:'#f1f5f9', padding:'2px 8px', borderRadius:20 }}>Reviewer Portal</span>
+            <span className="nav-portal-badge" style={{ fontSize:11, color:'var(--text-muted)', fontWeight:500, marginLeft:8, background:'#f1f5f9', padding:'2px 8px', borderRadius:20 }}>Reviewer Portal</span>
           </div>
         </Link>
 
@@ -86,7 +94,7 @@ export default function Navbar({ user, onAuthClick, balance = 0 }) {
           {user ? (
             <button onClick={onAuthClick} style={{ display:'flex', alignItems:'center', gap:9, padding:'6px 14px 6px 6px', background:'#f8f9fc', border:'1.5px solid var(--border)', borderRadius:24, cursor:'pointer', fontSize:14, fontWeight:600, color:'var(--text)' }}>
               <div style={{ width:30, height:30, borderRadius:'50%', background:'var(--brand-gradient)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:'#fff' }}>{initials}</div>
-              {user.name.split(' ')[0]}
+              <span className="nav-user-label">{user.name.split(' ')[0]}</span>
               <Icon.ChevronDown size={14} style={{ color:'var(--text-muted)' }} />
             </button>
           ) : (

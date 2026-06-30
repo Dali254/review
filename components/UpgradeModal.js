@@ -65,7 +65,13 @@ export default function UpgradeModal({ user, onClose, onSuccess }) {
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:600, background:'rgba(20,20,31,0.5)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end', justifyContent:'center' }} onClick={() => step!=='paying' && onClose()}>
-      <div className="glass-card" style={{ background:'#fff', borderTopLeftRadius:24, borderTopRightRadius:24, padding:'12px 28px env(safe-area-inset-bottom,32px)', width:'100%', maxWidth:460, animation:'fadeUp .3s ease' }} onClick={e=>e.stopPropagation()}>
+      <div className="glass-card upgrade-modal-card" style={{ background:'#fff', borderTopLeftRadius:24, borderTopRightRadius:24, padding:'12px 28px env(safe-area-inset-bottom,32px)', width:'100%', maxWidth:460, animation:'fadeUp .3s ease', maxHeight:'92vh', overflowY:'auto' }} onClick={e=>e.stopPropagation()}>
+        <style>{`
+          @media (max-width: 420px) {
+            .upgrade-modal-card { padding: 10px 18px env(safe-area-inset-bottom,28px) !important; }
+            .upgrade-plan-grid { grid-template-columns: 1fr !important; }
+          }
+        `}</style>
         <div style={{ width:36, height:4, background:'var(--border-strong)', borderRadius:2, margin:'0 auto 22px' }} />
 
         {step === 'plans' && (
@@ -80,7 +86,7 @@ export default function UpgradeModal({ user, onClose, onSuccess }) {
               </p>
             </div>
 
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:24 }}>
+            <div className="upgrade-plan-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:24 }}>
               <div style={{ background:'#f8f9fc', border:'1.5px solid var(--border)', borderRadius:14, padding:'18px 14px' }}>
                 <div style={{ fontSize:12, fontWeight:700, color:'var(--text-muted)', marginBottom:12, textTransform:'uppercase', letterSpacing:'0.5px' }}>Free</div>
                 {[`${DAILY_FREE_LIMIT} reviews / day`, `${format(MIN_EARN)}–${format(MAX_EARN)} each`, 'Standard payout'].map(f => (
